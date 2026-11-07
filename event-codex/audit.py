@@ -5,7 +5,7 @@ workflow = Path(".github/workflows/ci-event-codex.yml").read_text()
 start = workflow.index("\n  codex:\n")
 end = workflow.index("\n  verify_codex:\n")
 codex = workflow[start:end]
-assert "if: ${{ needs.validate.result == 'success' && vars.SYNTHETIC_EVENT_AI_ENABLED == 'true' && github.run_attempt == 1 }}" in codex, "PAID JOB MUST REMAIN OPT-IN AND BOUNDED"
+assert "if: ${{ false }}" in codex, "CONSUMED PAID JOB MUST REMAIN HARD DISABLED"
 assert "SYNTHETIC_EVENT_CONTROLLER_SHA" in codex and "SYNTHETIC_EVENT_APPROVED_SHA" in codex
 assert "APPROVED_CONTROLLER_SHA!==context.sha" in codex
 assert "process.env.APPROVED_SOURCE_SHA" in codex
@@ -20,4 +20,6 @@ assert "workflow_run:" in workflow and "types: [completed]" in workflow
 assert workflow.count("secrets.OPENAI_API_KEY") == 1
 assert "ref: ${{ github.sha }}" in workflow
 assert "contents: write" not in workflow
-print("Stage4 audit: paid job opt-in gated, isolated and secret-free verification")
+assert "if not data.endswith(b'\\n')" in workflow
+assert "Path(os.environ['PATCH']).write_bytes(data)" in workflow
+print("Stage4 audit: consumed paid job disabled; future diff LF normalized; key isolated")
