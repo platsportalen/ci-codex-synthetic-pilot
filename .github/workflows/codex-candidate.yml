@@ -1,4 +1,4 @@
-name: Reviewed Codex candidate (paid disabled)
+name: Reviewed Codex single approved pilot
 on:
   push:
     branches: [control/codex-v1]
@@ -35,8 +35,8 @@ jobs:
             assertCI(ci,source);
   codex:
     name: Codex single paid pass
-    # HARD STOP: removing this requires separate explicit product-owner approval.
-    if: ${{ false }}
+    # Owner authorized one synthetic-zero-v1 pass; Environment approval is still mandatory.
+    if: ${{ success() }}
     needs: validate
     environment: synthetic-pilot-approval
     runs-on: ubuntu-24.04

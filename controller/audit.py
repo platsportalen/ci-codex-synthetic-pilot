@@ -2,7 +2,11 @@ from pathlib import Path
 import tempfile,subprocess,sys,difflib,yaml,shutil
 root=Path(__file__).resolve().parents[1]
 w=yaml.safe_load((root/'.github/workflows/codex-candidate.yml').read_text());jobs=w['jobs'];paid=jobs['codex']
-assert paid['if']=='${{ false }}', 'Paid run must remain literally disabled'
+assert paid['if']=='${{ success() }}', 'Only successful validation may reach the Environment gate'
+assert w['concurrency']=={'group':'synthetic-codex-single-step-v1','cancel-in-progress':False}
+assert "process.env.CONTROL_APPROVED_SHA!==context.sha" in paid['steps'][0]['with']['script']
+assert "filter:'all'" in paid['steps'][0]['with']['script']
+assert "attempt!==1" in paid['steps'][0]['with']['script']
 assert paid['needs']=='validate' and paid['environment']=='synthetic-pilot-approval'
 assert paid['permissions']=={'contents':'read','actions':'read','pull-requests':'read'}
 assert not any('checkout@' in s.get('uses','') for s in paid['steps'])
