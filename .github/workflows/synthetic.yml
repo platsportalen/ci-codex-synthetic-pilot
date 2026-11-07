@@ -51,11 +51,16 @@ jobs:
             const {data:pr}=await github.rest.pulls.get({...context.repo,pull_number:1});
             const {data:current}=await github.rest.actions.getWorkflowRun({...context.repo,run_id:context.runId});
             const runs=await github.paginate(github.rest.actions.listWorkflowRuns,{...context.repo,workflow_id:current.workflow_id,head_sha:sha,per_page:100});
+            // Reopening the same approved synthetic PR rechecks all tests without
+            // a new source SHA. Repeated fixture generation is UNPAID. Paid
+            // Codex work-step reservations are enforced by its separate controller.
             let duplicate=false;
-            for(const run of runs){
-              if(run.id===context.runId)continue;
-              const jobs=await github.paginate(github.rest.actions.listJobsForWorkflowRun,{...context.repo,run_id:run.id,filter:'all',per_page:100});
-              if(jobs.some(j=>j.name==='Generate SYNTHETIC patch (NOT Codex)' && j.conclusion!=='skipped'))duplicate=true;
+            if(context.payload.action!=='reopened'){
+              for(const run of runs){
+                if(run.id===context.runId)continue;
+                const jobs=await github.paginate(github.rest.actions.listJobsForWorkflowRun,{...context.repo,run_id:run.id,filter:'all',per_page:100});
+                if(jobs.some(j=>j.name==='Generate SYNTHETIC patch (NOT Codex)' && j.conclusion!=='skipped'))duplicate=true;
+              }
             }
             require('./lab/policy.cjs').check({pr,sha,duplicate,attempt:Number(process.env.GITHUB_RUN_ATTEMPT)});
       - run: python lab/patch.py fixture /tmp/synthetic.patch
