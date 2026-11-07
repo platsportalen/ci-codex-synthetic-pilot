@@ -86,7 +86,6 @@ jobs:
   approval_probe:
     name: Approval probe (NO secrets or AI)
     needs: verify
-    if: vars.SYNTHETIC_APPROVAL_PROBE_ENABLED == 'true'
     environment: synthetic-pilot-approval
     runs-on: ubuntu-latest
     timeout-minutes: 2
