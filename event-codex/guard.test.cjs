@@ -43,11 +43,15 @@ test('requires explicit activation, matching source and current trusted controll
    {trustedCommit:'c'.repeat(40)},{currentDefaultCommit:'c'.repeat(40)}
  ])assert.throws(()=>assertActivation({...good,...change}),/denied/);
 });
-test('single paid work step, historical failure also consumes it',()=>{
- const runs=[{id:1},{id:2}];
- assert.doesNotThrow(()=>assertNoPaidAttempt({runs,currentRunId:2,jobsByRun:new Map([[1,[{name:TARGET.paidJobName,conclusion:'skipped'}]]])}));
- for(const status of ['success','failure',null,'cancelled']) {
-  assert.throws(()=>assertNoPaidAttempt({runs,currentRunId:2,jobsByRun:new Map([[1,[{name:TARGET.paidJobName,conclusion:status}]])]}),/denied/);
- }
- assert.throws(()=>assertNoPaidAttempt({runs,currentRunId:2,jobsByRun:new Map()}),/denied/);
+test('single paid work step, historical failure also consumes it', () => {
+  const runs=[{id:1},{id:2}];
+  const skipped = new Map();
+  skipped.set(1, [{name:TARGET.paidJobName,conclusion:'skipped'}]);
+  assert.doesNotThrow(() => assertNoPaidAttempt({runs,currentRunId:2,jobsByRun:skipped}));
+  for(const status of ['success','failure',null,'cancelled']) {
+    const prior = new Map();
+    prior.set(1, [{name:TARGET.paidJobName,conclusion:status}]);
+    assert.throws(() => assertNoPaidAttempt({runs,currentRunId:2,jobsByRun:prior}), /denied/);
+  }
+  assert.throws(() => assertNoPaidAttempt({runs,currentRunId:2,jobsByRun:new Map()}), /denied/);
 });
