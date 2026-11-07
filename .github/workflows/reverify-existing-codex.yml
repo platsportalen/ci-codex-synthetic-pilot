@@ -1,0 +1,47 @@
+name: Verify existing Codex patch without new AI
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'event-codex/**'
+      - '.github/workflows/ci-event-codex.yml'
+      - '.github/workflows/reverify-existing-codex.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  reverify:
+    name: Recheck ORIGINAL paid artifact, NO new model invocation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Test repair contract and negative examples
+        run: |
+          python -m unittest discover -s event-codex -p 'test_format_patch.py' -v
+          python -m unittest discover -s event-codex -p 'test_security.py' -v
+          python event-codex/audit.py
+          node --test event-codex/guard.test.cjs
+      - name: Download the EXACT completed Codex run's original patch artifact
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: event-codex-patch-42423040999
+          run-id: 42423040999
+          github-token: ${{ github.token }}
+          path: incoming
+      - name: Assert original SHA256, append only terminal LF and test separately
+        run: |
+          mkdir -p normalized /tmp/reverify-original-codex
+          python event-codex/format_patch.py \
+            incoming/codex.patch normalized/codex.patch \
+            1b83b52f8d47d64497908fdedff242ae1eae63c51d530a6b0b34c443ec75668c
+          cp event-codex/sample-baseline.py /tmp/reverify-original-codex/sample.py
+          cp event-codex/test_result.py event-codex/verify.py /tmp/reverify-original-codex/
+          git -C /tmp/reverify-original-codex init -q
+          cd /tmp/reverify-original-codex
+          python verify.py "$GITHUB_WORKSPACE/normalized/codex.patch"
+          echo "The original paid Codex patch passed all 4 acceptance tests (no extra API calls)."

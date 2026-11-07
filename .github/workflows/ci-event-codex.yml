@@ -92,8 +92,9 @@ jobs:
           python verify.py "$GITHUB_WORKSPACE/incoming/fixture.patch"
   codex:
     name: Codex event paid pass
-    # Opt-in only: repository switch defaults OFF; protected Environment review remains mandatory.
-    if: ${{ needs.validate.result == 'success' && vars.SYNTHETIC_EVENT_AI_ENABLED == 'true' && github.run_attempt == 1 }}
+    # CONSIGNED: Stage4 first model pass was completed; no new paid pass authorised.
+    # A future new work step requires separately reviewed activation, exact SHA pins and Environment review.
+    if: ${{ false }}
     needs: validate
     environment: synthetic-pilot-approval
     runs-on: ubuntu-24.04
@@ -180,8 +181,12 @@ jobs:
           from pathlib import Path
           obj=json.loads(Path(os.environ['RESULT']).read_text())
           assert set(obj)=={'patch'} and isinstance(obj['patch'],str)
-          assert 0 < len(obj['patch'].encode('utf-8')) <= 8192
-          Path(os.environ['PATCH']).write_text(obj['patch'])
+          data = obj['patch'].encode('utf-8')
+          assert 0 < len(data) <= 8192 and b'\x00' not in data
+          if not data.endswith(b'\n'):
+              data += b'\n'  # Format only; never change model-supplied diff lines.
+          assert len(data) <= 8192
+          Path(os.environ['PATCH']).write_bytes(data)
           PY
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
