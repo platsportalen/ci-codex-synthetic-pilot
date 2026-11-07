@@ -1,6 +1,6 @@
 # Stage 4 — trusted event-to-Codex candidate
 
-CURRENT STATUS: prepared, unpaid. This pilot stays entirely in the PUBLIC SYNTHETIC REPOSITORY. No private Weazy code, customer data, tokens, Railway or production changes. Existing Work A/B/C and Weazy PR #92 are untouched.
+CURRENT STATUS: opt-in activation prepared in a separate PR. No paid Codex pass has been authorized or executed by this event workflow. This pilot stays entirely in the PUBLIC SYNTHETIC REPOSITORY. No private Weazy code, customer data, tokens, Railway or production changes. Existing Work A/B/C and Weazy PR #92 are untouched.
 
 ## What runs automatically
 
@@ -10,17 +10,17 @@ Red CI, wrong PR/repository/workflow, stale head, forks and reruns fail closed o
 
 ## Future real Codex path — deliberately OFF
 
-The Codex job uses a LITERAL FALSE job condition, enforced by event-codex/audit.py. The key-bearing job requires protected GitHub Environment synthetic-pilot-approval and has no checkout of PR code or history. Only pinned Actions, a trusted inline scope/duplication guard, and a fixed prompt operate before model invocation. It fetches exactly lab/sample.py as data from an explicitly approved source SHA, then executes pinned openai/codex-action using the proxied API key. A fresh runner WITHOUT Environment secrets applies the returned bounded JSON patch and runs trusted tests. No push, merge, or deployment can occur.
+The Codex job is OPT-IN only: its job condition requires successful CI, repository variable SYNTHETIC_EVENT_AI_ENABLED=true and first run attempt. The safe condition is enforced by event-codex/audit.py. Without the flag, the paid job is skipped. The key-bearing job requires protected GitHub Environment synthetic-pilot-approval and has no checkout of PR code or history. Only pinned Actions, a trusted inline scope/duplication guard, and a fixed prompt operate before model invocation. It fetches exactly lab/sample.py as data from an explicitly approved source SHA, then executes pinned openai/codex-action using the proxied API key. A fresh runner WITHOUT Environment secrets applies the returned bounded JSON patch and runs trusted tests. No push, merge, or deployment can occur.
 
 Before any future paid activation:
 
 1. Obtain an explicit authorization for a NEW work step synthetic-ci-codex-v1 (the old synthetic-zero-v1 is ALREADY CONSUMED). Verify the dedicated OpenAI project limit and selected model.
-2. Audit a controller-only activation commit that removes literal false and updates the test audit. Pin the final default-branch/controller SHA and the approved source PR SHA in repository or Environment variables SYNTHETIC_EVENT_CONTROLLER_SHA / SYNTHETIC_EVENT_APPROVED_SHA; require SYNTHETIC_EVENT_AI_ENABLED=true. Approval variables are NOT a substitute for GitHub Environment review.
+2. Review the separate opt-in activation commit and its updated audit before merging to the trusted public pilot default branch. Pin the final default-branch/controller SHA and the approved source PR SHA in repository or Environment variables SYNTHETIC_EVENT_CONTROLLER_SHA / SYNTHETIC_EVENT_APPROVED_SHA; require SYNTHETIC_EVENT_AI_ENABLED=true. Approval variables are NOT a substitute for GitHub Environment review.
 3. GitHub Environment synthetic-pilot-approval currently permits only control/codex-v1. An authorized administrator must review any adjustment to permit trusted public pilot main WITHOUT allowing untrusted PR heads. Required reviewer and disabled administrative bypass must remain.
 4. A fresh green synthetic CI completion will then queue the job for Environment approval. After owner review, re-fetch PR/run/default-branch SHA and scan retained workflow history for any prior non-skipped Codex event paid pass. One attempt, no automatic retries; successful OR failed paid attempt consumes the step. Concurrency serializes the workflow but is NOT a durable transactional lock if GitHub run history is deleted or workflows change.
 5. After a paid run verify that the model produced one allowlisted patch, tested on separate runner without any secret. Public logs/artifacts must contain synthetic data only. The hard spend cap is not a guarantee of exact billed cost.
 
-GitHub workflow_run requires trusted workflow code on default branch, which is why this candidate must be merged only after its own PR tests, diff and security audit are green.
+GitHub workflow_run requires trusted code on default branch. The opt-in activation change must be separately reviewed and verified before merge. The opt-in condition alone does not grant access to any API key.
 
 ## Out of scope
 

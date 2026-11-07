@@ -92,8 +92,8 @@ jobs:
           python verify.py "$GITHUB_WORKSPACE/incoming/fixture.patch"
   codex:
     name: Codex event paid pass
-    # HARD STOP: requires a separately reviewed activation commit.
-    if: ${{ false }}
+    # Opt-in only: repository switch defaults OFF; protected Environment review remains mandatory.
+    if: ${{ needs.validate.result == 'success' && vars.SYNTHETIC_EVENT_AI_ENABLED == 'true' && github.run_attempt == 1 }}
     needs: validate
     environment: synthetic-pilot-approval
     runs-on: ubuntu-24.04
