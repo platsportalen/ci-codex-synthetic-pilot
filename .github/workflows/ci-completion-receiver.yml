@@ -1,0 +1,106 @@
+name: Synthetic CI completion receiver (unpaid)
+run-name: receiver-source-${{ github.event.workflow_run.id }}
+on:
+  workflow_run:
+    workflows: [Synthetic CI pipeline]
+    types: [completed]
+permissions:
+  contents: read
+concurrency:
+  group: synthetic-ci-receiver-pr1
+  cancel-in-progress: false
+jobs:
+  validate:
+    name: Validate exact source PR CI
+    if: >-
+      github.repository == 'platsportalen/ci-codex-synthetic-pilot' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.head_branch == 'pilot/synthetic-v1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+    outputs:
+      source_run_id: ${{ steps.scope.outputs.source_run_id }}
+      source_head_sha: ${{ steps.scope.outputs.source_head_sha }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ github.sha }}  # workflow_run GITHUB_SHA: trusted default-branch commit
+          persist-credentials: false
+      - name: Re-fetch PR and completed CI; reject stale head and duplicates
+        id: scope
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
+        with:
+          script: |
+            const {checkSource, checkNoPriorContinuation} = require('./receiver/guard.cjs');
+            const sourceId = context.payload.workflow_run?.id;
+            const {data:pr} = await github.rest.pulls.get({...context.repo, pull_number:1});
+            const {data:sourceRun} = await github.rest.actions.getWorkflowRun({...context.repo, run_id:sourceId});
+            const valid = checkSource({
+              repository:context.payload.repository,
+              pr, run:sourceRun, eventRun:context.payload.workflow_run,
+              attempt:Number(process.env.GITHUB_RUN_ATTEMPT),
+            });
+            const marker = 'receiver-source-'+valid.sourceRunId;
+            const {data:self} = await github.rest.actions.getWorkflowRun({...context.repo, run_id:context.runId});
+            const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
+              ...context.repo, workflow_id:self.workflow_id, per_page:100,
+            });
+            const jobsByRun = new Map();
+            for (const run of runs) {
+              if (run.id === context.runId || run.display_title !== marker) continue;
+              const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+                ...context.repo, run_id:run.id, per_page:100, filter:'all',
+              });
+              jobsByRun.set(run.id, jobs);
+            }
+            checkNoPriorContinuation(runs, context.runId, marker, jobsByRun);
+            core.setOutput('source_run_id', String(valid.sourceRunId));
+            core.setOutput('source_head_sha', valid.sha);
+  continue:
+    name: Continue synthetic work (NO AI)
+    needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Produce trusted continuation proof, no PR files or secrets
+        env:
+          SOURCE_RUN_ID: ${{ needs.validate.outputs.source_run_id }}
+          SOURCE_HEAD_SHA: ${{ needs.validate.outputs.source_head_sha }}
+        run: node receiver/proof.cjs create
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: receiver-proof-${{ github.run_id }}
+          path: proof/ci-completion.json
+          retention-days: 3
+  verify:
+    name: Verify continuation on separate runner
+    needs: [validate, continue]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: receiver-proof-${{ github.run_id }}
+          path: incoming
+      - name: Check artifact content against validated CI identity
+        env:
+          SOURCE_RUN_ID: ${{ needs.validate.outputs.source_run_id }}
+          SOURCE_HEAD_SHA: ${{ needs.validate.outputs.source_head_sha }}
+        run: node receiver/proof.cjs verify
