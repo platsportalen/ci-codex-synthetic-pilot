@@ -1,0 +1,95 @@
+name: Synthetic CI pipeline
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+concurrency:
+  group: synthetic-v1-pr-1
+  cancel-in-progress: false
+jobs:
+  validate:
+    if: github.repository == 'platsportalen/ci-codex-synthetic-pilot' && github.event.pull_request.number == 1 && github.event.pull_request.head.repo.id == 1449650612 && github.event.pull_request.head.ref == 'pilot/synthetic-v1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
+        with:
+          script: |
+            const {data:pr}=await github.rest.pulls.get({...context.repo,pull_number:1});
+            require('./lab/policy.cjs').check({pr,sha:context.payload.pull_request.head.sha,attempt:Number(process.env.GITHUB_RUN_ATTEMPT)});
+      - run: |
+          node lab/test_policy.cjs
+          cd lab
+          python -m unittest test_baseline test_boundaries
+  generate:
+    name: Generate SYNTHETIC patch (NOT Codex)
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
+        with:
+          script: |
+            const sha=context.payload.pull_request.head.sha;
+            const {data:pr}=await github.rest.pulls.get({...context.repo,pull_number:1});
+            const {data:current}=await github.rest.actions.getWorkflowRun({...context.repo,run_id:context.runId});
+            const runs=await github.paginate(github.rest.actions.listWorkflowRuns,{...context.repo,workflow_id:current.workflow_id,head_sha:sha,per_page:100});
+            let duplicate=false;
+            for(const run of runs){
+              if(run.id===context.runId)continue;
+              const jobs=await github.paginate(github.rest.actions.listJobsForWorkflowRun,{...context.repo,run_id:run.id,filter:'all',per_page:100});
+              if(jobs.some(j=>j.name==='Generate SYNTHETIC patch (NOT Codex)' && j.conclusion!=='skipped'))duplicate=true;
+            }
+            require('./lab/policy.cjs').check({pr,sha,duplicate,attempt:Number(process.env.GITHUB_RUN_ATTEMPT)});
+      - run: python lab/patch.py fixture /tmp/synthetic.patch
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: synthetic-patch-${{ github.event.pull_request.head.sha }}
+          path: /tmp/synthetic.patch
+          retention-days: 3
+  verify:
+    name: Verify patch on separate runner
+    needs: [validate, generate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: synthetic-patch-${{ github.event.pull_request.head.sha }}
+          path: incoming
+      - run: |
+          mkdir /tmp/synthetic-verification
+          cp lab/sample.py lab/test_baseline.py lab/test_acceptance.py lab/patch.py /tmp/synthetic-verification/
+          git -C /tmp/synthetic-verification init
+          python /tmp/synthetic-verification/patch.py verify "$PWD/incoming/synthetic.patch"
+  approval_probe:
+    name: Approval probe (NO secrets or AI)
+    needs: verify
+    if: vars.SYNTHETIC_APPROVAL_PROBE_ENABLED == 'true'
+    environment: synthetic-pilot-approval
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions: {}
+    steps:
+      - run: echo 'Approval gate released. No key, no API call, no source execution.'
