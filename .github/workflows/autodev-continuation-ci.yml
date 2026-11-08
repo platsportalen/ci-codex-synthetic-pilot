@@ -1,0 +1,93 @@
+name: Autodev synthetic continuation CI
+run-name: autodev-continuation-${{ inputs.expected_sha }}
+on:
+  workflow_dispatch:
+    inputs:
+      task_id:
+        description: Approved synthetic task ID
+        required: true
+        type: string
+      expected_sha:
+        description: Exact source PR head SHA to test
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: autodev-synthetic-continuation-ci
+  cancel-in-progress: false
+jobs:
+  validate:
+    name: Validate exact continuation target
+    if: github.repository == 'platsportalen/ci-codex-synthetic-pilot' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Require matching PR1, state, SHA and task ID
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+          TASK_ID: ${{ inputs.task_id }}
+        with:
+          script: |
+            const fs=require('node:fs');
+            const order=require('./engine/pilot-order.json');
+            const sha=process.env.EXPECTED_SHA;
+            if(process.env.TASK_ID!==order.taskId || !/^[0-9a-f]{40}$/.test(sha)
+              || Number(process.env.GITHUB_RUN_ATTEMPT)!==1)
+              throw Error('Invalid continuation job scope');
+            const {data:pr}=await github.rest.pulls.get({...context.repo,pull_number:1});
+            if(pr.state!=='open'||pr.base.ref!=='main'||
+              pr.head.ref!=='pilot/synthetic-v1'||pr.head.sha!==sha||
+              pr.head.repo.id!==1449650612)throw Error('Source head changed');
+            const {data:file}=await github.rest.repos.getContent({
+              ...context.repo,path:'state/pilot_task_1.json',ref:'autodev-state'});
+            if(file.type!=='file'||file.encoding!=='base64'||file.size>16384)
+              throw Error('Bad task state file');
+            const state=JSON.parse(Buffer.from(file.content,'base64').toString('utf8'));
+            if(state.taskId!==order.taskId||state.repository!==order.repository||
+              state.phase!=='TESTING'||state.headSha!==sha)
+              throw Error('Task state not ready for source CI');
+            core.info('Approved exact source CI target '+sha);
+  tests:
+    name: Run trusted acceptance cases without credentials
+    needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Download source file as data, never run PR test scripts
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
+        env:
+          SOURCE_SHA: ${{ inputs.expected_sha }}
+        with:
+          script: |
+            const fs=require('node:fs');
+            const sha=process.env.SOURCE_SHA;
+            if(!/^[0-9a-f]{40}$/.test(sha))throw Error('Invalid SHA');
+            const {data:pr}=await github.rest.pulls.get({...context.repo,pull_number:1});
+            if(pr.head.sha!==sha)throw Error('Source HEAD moved');
+            const {data:file}=await github.rest.repos.getContent({
+              ...context.repo,path:'lab/sample.py',ref:sha});
+            if(file.type!=='file'||file.encoding!=='base64'||file.size>4096)
+              throw Error('Invalid source data');
+            fs.mkdirSync('/tmp/continuation-ci',{recursive:true});
+            fs.writeFileSync('/tmp/continuation-ci/sample.py',Buffer.from(file.content,'base64'));
+      - name: Execute trusted four-case acceptance tests
+        run: |
+          cp event-codex/test_result.py /tmp/continuation-ci/test_result.py
+          cd /tmp/continuation-ci
+          python test_result.py
