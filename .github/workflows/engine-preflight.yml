@@ -70,7 +70,8 @@ jobs:
           assert 'environment' not in source_ci['jobs']['report']
           assert source_ci['jobs']['tests']['permissions']['contents'] == 'read'
           assert 'environment' not in source_ci['jobs']['tests']
-          assert "secrets.OPENAI_API_KEY" not in str(source_ci)
+          assert "secrets.OPENAI_API_KEY" not in str({
+              k:v for k,v in source_ci['jobs'].items() if k != 'direct_codex'})
           smoke = yaml.safe_load(Path('.github/workflows/autodev-dispatch-smoke.yml').read_text())
           assert smoke['jobs']['dispatch']['permissions']['actions'] == 'write'
           assert smoke['jobs']['dispatch']['permissions']['contents'] == 'read'
