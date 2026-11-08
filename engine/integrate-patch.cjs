@@ -41,9 +41,9 @@ function applyDataOnlyPatch(sourceBytes,patchBytes){
   }
 }
 
-async function publishVerifiedPatch({github,context,receipt,patchBytes,core,
+async function publishVerifiedPatch({github,context,receipt,patchBytes,core,sourceEvidence,
   order=require('./pilot-order.json'),runId}){
-  await verifyReservedStep({github,context,receipt,order,runId});
+  await verifyReservedStep({github,context,receipt,sourceEvidence,order,runId});
   need(Number.isSafeInteger(runId)&&runId>0&&
     Number(process.env.GITHUB_RUN_ATTEMPT)===1,'workflow run attempt');
   const {data:currentPR}=await github.rest.pulls.get({
