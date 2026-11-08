@@ -261,3 +261,67 @@ jobs:
           git -C /tmp/autodev-verify init -q
           cd /tmp/autodev-verify
           python verify.py "$GITHUB_WORKSPACE/incoming/codex.patch"
+  land_verified_patch:
+    name: Fast-forward verified patch to isolated synthetic PR (DEFAULT OFF)
+    needs: [decide, codex_paid, verify_codex_paid]
+    if: >-
+      needs.verify_codex_paid.result == 'success' &&
+      vars.AUTODEV_LANDING_V1_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: true
+          fetch-depth: 1
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: autodev-codex-${{ github.run_id }}
+          path: incoming/code
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: autodev-next-${{ github.run_id }}
+          path: incoming/order
+      - name: Validate original source CI, PR, controller and bounded patch before Git write
+        id: check
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
+        with:
+          script: |
+            const fs=require('node:fs');
+            const {verifyLanding,assertPatchContents}=require('./engine/landing.cjs');
+            const {verifyReservedStep}=require('./engine/paid-runner.cjs');
+            const receipt=JSON.parse(fs.readFileSync('incoming/order/workorder.json','utf8'));
+            const {data:pr}=await github.rest.pulls.get({...context.repo,pull_number:1});
+            const {data:run}=await github.rest.actions.getWorkflowRun({
+              ...context.repo,run_id:context.payload.workflow_run.id});
+            const result=verifyLanding({
+              receipt,pr,run,eventRun:context.payload.workflow_run,
+              repository:context.payload.repository,controllerSha:context.sha,
+              attempt:Number(process.env.GITHUB_RUN_ATTEMPT)});
+            await verifyReservedStep({github,context,receipt,runId:context.runId});
+            assertPatchContents(fs.readFileSync('incoming/code/codex.patch','utf8'));
+            const {data:main}=await github.rest.git.getRef({...context.repo,ref:'heads/main'});
+            if(main.object.sha!==context.sha)throw Error('Stale trusted controller');
+            core.setOutput('source_sha',result.sha);
+            core.info('Strict fast-forward pilot landing approved: '+result.sourceRunId);
+      - name: Apply data-only patch and push FAST-FORWARD to exact synthetic PR branch
+        env:
+          SOURCE_SHA: ${{ steps.check.outputs.source_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "$SOURCE_SHA"
+          git checkout --detach "$SOURCE_SHA"
+          git apply --check --directory=lab "$GITHUB_WORKSPACE/incoming/code/codex.patch"
+          git apply --directory=lab "$GITHUB_WORKSPACE/incoming/code/codex.patch"
+          test "$(git diff --name-only)" = "lab/sample.py"
+          git add -- lab/sample.py
+          git -c user.name=autodev-bot -c user.email=autodev@invalid commit -m "synthetic: verified Codex patch"
+          # No forced update; concurrent branch changes are rejected by normal Git push.
+          git push origin HEAD:refs/heads/pilot/synthetic-v1
+          echo 'Patch landed. Note: GITHUB_TOKEN push alone does not trigger PR CI.'
