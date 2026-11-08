@@ -26,6 +26,7 @@ jobs:
     outputs:
       phase: ${{ steps.update.outputs.phase }}
       source_run_id: ${{ steps.update.outputs.source_run_id }}
+      source_sha: ${{ steps.update.outputs.source_sha }}
     permissions:
       contents: write
       actions: read
@@ -66,6 +67,7 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
         env:
           SOURCE_RUN_ID: ${{ needs.decide.outputs.source_run_id }}
+          SOURCE_SHA: ${{ needs.decide.outputs.source_sha }}
         with:
           script: |
             const fs=require('node:fs');
@@ -80,7 +82,7 @@ jobs:
             const receipt=createWorkOrder(order,state,{
               sourceRunId,controllerSha:context.sha,stateSha:file.sha});
             verifyWorkOrder(order,receipt,{
-              sourceRunId,sourceSha:context.payload.workflow_run.head_sha,
+              sourceRunId,sourceSha:process.env.SOURCE_SHA,
               controllerSha:context.sha});
             fs.mkdirSync('next-step',{recursive:true});
             fs.writeFileSync('next-step/workorder.json',JSON.stringify(receipt,null,2)+'\n');
@@ -109,7 +111,7 @@ jobs:
       - name: Verify bounded step, CI SHA and authorized paths on new runner
         env:
           SOURCE_RUN_ID: ${{ needs.decide.outputs.source_run_id }}
-          SOURCE_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          SOURCE_HEAD_SHA: ${{ needs.decide.outputs.source_sha }}
           CONTROLLER_SHA: ${{ github.sha }}
         run: node engine/continuation.cjs verify incoming/workorder.json
   reserve_paid:
@@ -244,15 +246,17 @@ jobs:
           path: incoming
       - name: Re-fetch authorized baseline without executing PR scripts
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
+        env:
+          SOURCE_SHA: ${{ needs.decide.outputs.source_sha }}
         with:
           script: |
             const fs=require('node:fs');
             const {data:pr}=await github.rest.pulls.get({...context.repo,pull_number:1});
-            const run=context.payload.workflow_run;
-            if(pr.state!=='open'||pr.head.sha!==run.head_sha)
+            const sourceSha=process.env.SOURCE_SHA;
+            if(pr.state!=='open'||pr.head.sha!==sourceSha)
               throw Error('Stale PR head during independent verification');
             const {data:file}=await github.rest.repos.getContent({
-              ...context.repo,path:'lab/sample.py',ref:run.head_sha});
+              ...context.repo,path:'lab/sample.py',ref:sourceSha});
             if(file.type!=='file'||file.encoding!=='base64'||file.size>4096)
               throw Error('Invalid baseline file');
             fs.mkdirSync('/tmp/autodev-verify',{recursive:true});
