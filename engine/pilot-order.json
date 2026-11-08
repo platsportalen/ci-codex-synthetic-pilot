@@ -1,0 +1,36 @@
+{
+  "taskId": "pilot_task_1",
+  "repository": "platsportalen/ci-codex-synthetic-pilot",
+  "baseSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "maxRepairs": 2,
+  "source": {
+    "repoId": 1449650612,
+    "pr": 1,
+    "baseBranch": "main",
+    "headBranch": "pilot/synthetic-v1",
+    "workflowId": 410595623,
+    "workflowName": "Synthetic CI pipeline",
+    "workflowPath": ".github/workflows/synthetic.yml"
+  },
+  "steps": [
+    {
+      "id": "zero_support",
+      "allowedPaths": [
+        "lab/sample.py"
+      ],
+      "acceptance": [
+        "Accept integer zero without accepting invalid input"
+      ]
+    },
+    {
+      "id": "final_verification",
+      "allowedPaths": [
+        "lab/sample.py",
+        "lab/test_acceptance.py"
+      ],
+      "acceptance": [
+        "All independent function tests pass with exact source SHA"
+      ]
+    }
+  ]
+}
