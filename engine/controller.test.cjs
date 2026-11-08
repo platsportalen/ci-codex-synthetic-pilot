@@ -40,6 +40,9 @@ test('red CI automatically requests bounded correction; no infinite retries',()=
   assert.equal(state.phase,'REPAIRING');assert.equal(state.repairs,2);
   state=patch(state,D);state=ci(state,2003,'failure');
   assert.equal(state.phase,'BLOCKED');
+  assert.equal(state.blocker.code,'CI_REPAIR_LIMIT');
+  assert.equal(state.blocker.stepId,'first_step');
+  assert.equal(state.blocker.sourceRunId,2003);
 });
 
 test('green CI after failed test clears repairs when next step starts',()=>{
@@ -71,4 +74,6 @@ test('unknown and malformed events fail closed',()=>{
 
 test('operator can halt any active task without publishing',()=>{
   const state=advance(order,start(),ev('HALT',A));assert.equal(state.phase,'BLOCKED');
+  assert.equal(state.blocker.code,'OPERATOR_HALT');
+  assert.equal(state.blocker.sha,A);
 });
