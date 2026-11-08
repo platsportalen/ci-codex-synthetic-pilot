@@ -151,3 +151,47 @@ test('state CAS write conflicts fail closed without pretending success',async()=
     await assert.rejects(()=>processCI({github,context:contextFor(e),core:{setOutput(){},info(){}}}),/409 conflict/);
   }finally{if(old===undefined)delete process.env.GITHUB_RUN_ATTEMPT;else process.env.GITHUB_RUN_ATTEMPT=old;}
 });
+
+test('trusted on-main dispatch CI maps verified PR source SHA, including red tests',()=>{
+  for(const conclusion of ['success','failure']){
+    const e=evidence(conclusion,78000);
+    const sha='e'.repeat(40);
+    e.run.event='workflow_dispatch';
+    e.run.name='Autodev synthetic continuation CI';
+    e.run.path='.github/workflows/autodev-continuation-ci.yml';
+    e.run.workflow_id=993311;
+    e.run.head_branch='main';
+    e.run.head_sha=sha;
+    e.run.display_title='autodev-continuation-'+HEAD;
+    e.run.pull_requests=[];
+    e.payloadRun.head_sha=sha;
+    e.jobs=[
+      {name:'Validate exact continuation target',conclusion:'success'},
+      {name:'Run trusted acceptance cases without credentials',conclusion}
+    ];
+    const verified=verifyCompletedCI(e);
+    assert.equal(verified.sha,HEAD);
+    assert.equal(verified.conclusion,conclusion);
+  }
+});
+test('dispatch with failed scope validation cannot masquerade as repairable red CI',()=>{
+  const e=evidence('failure',78001),sha='e'.repeat(40);
+  e.run.event='workflow_dispatch';
+  e.run.name='Autodev synthetic continuation CI';
+  e.run.path='.github/workflows/autodev-continuation-ci.yml';
+  e.run.workflow_id=993311;
+  e.run.head_branch='main';e.run.head_sha=sha;
+  e.payloadRun.head_sha=sha;e.run.display_title='autodev-continuation-'+HEAD;
+  e.jobs=[
+    {name:'Validate exact continuation target',conclusion:'failure'},
+    {name:'Run trusted acceptance cases without credentials',conclusion:'skipped'}
+  ];
+  assert.throws(()=>verifyCompletedCI(e),/source validation or test provenance/);
+  e.jobs[0].conclusion='success';
+  e.jobs[1].conclusion='failure';
+  e.run.display_title='autodev-continuation-'+'a'.repeat(40);
+  assert.throws(()=>verifyCompletedCI(e),/dispatch expected source SHA/);
+  e.run.display_title='autodev-continuation-'+HEAD;
+  e.run.head_branch='pilot/synthetic-v1';
+  assert.throws(()=>verifyCompletedCI(e),/trusted main source/);
+});
