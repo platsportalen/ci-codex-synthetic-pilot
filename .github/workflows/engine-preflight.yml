@@ -41,7 +41,12 @@ jobs:
           assert jobs['integrate_patch']['permissions']['contents'] == 'write'
           assert jobs['integrate_patch']['permissions']['actions'] == 'write'
           assert 'environment' not in jobs['integrate_patch']
-          source_ci = yaml.safe_load(Path('.github/workflows/autodev-continuation-ci.yml').read_text())
+          source_path = Path('.github/workflows/autodev-continuation-ci.yml')
+          source_text = source_path.read_text()
+          assert 'run-name:' not in source_text, 'dynamic run-name breaks workflow_run subscription'
+          assert 'autodev-validated-${{ github.run_id }}' in source_text
+          assert 'source-evidence/validated-source.json' in Path('.github/workflows/engine-ci-event.yml').read_text()
+          source_ci = yaml.safe_load(source_text)
           assert source_ci['jobs']['tests']['needs'] == 'validate'
           assert source_ci['jobs']['tests']['permissions']['contents'] == 'read'
           assert 'environment' not in source_ci['jobs']['tests']
