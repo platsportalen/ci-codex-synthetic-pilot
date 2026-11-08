@@ -1,7 +1,7 @@
 {
   "taskId": "pilot_task_1",
   "repository": "platsportalen/ci-codex-synthetic-pilot",
-  "phase": "REPAIRING",
+  "phase": "TESTING",
   "headSha": "5968c5ce6e686b92f1d1f96c97a057a5a62c0abf",
   "stepIndex": 1,
   "repairs": 1,
@@ -14,7 +14,8 @@
     "synthetic_new_episode_v2",
     "ci_42473418336",
     "smoke_red_dispatch_test_20261108",
-    "ci_42479490153"
+    "ci_42479490153",
+    "synthetic_repeat_red_ci_after_fix20"
   ],
   "seenCiRunIds": [
     42472850043,
