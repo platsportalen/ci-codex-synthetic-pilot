@@ -23,8 +23,12 @@ function assertSyntheticScope(order,receipt,context){
     'synthetic source scope');
   need(receipt.taskId===order.taskId && receipt.repository===order.repository,
     'work order identity');
-  need(receipt.sourceRunId===context.payload?.workflow_run?.id &&
-    receipt.sourceSha===context.payload?.workflow_run?.head_sha &&
+  const source=context.payload?.workflow_run;
+  const sourceBound=source?.event==='workflow_dispatch'
+    ?(source.display_title==='autodev-continuation-'+receipt.sourceSha &&
+      source.head_branch==='main')
+    :(source?.head_sha===receipt.sourceSha);
+  need(receipt.sourceRunId===source?.id && sourceBound &&
     receipt.controllerSha===context.sha,'source/controller binding');
   verifyWorkOrder(order,receipt,{
     sourceRunId:receipt.sourceRunId,sourceSha:receipt.sourceSha,
