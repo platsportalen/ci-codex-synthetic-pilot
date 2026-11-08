@@ -45,6 +45,11 @@ jobs:
           assert 'environment' not in jobs['integrate_patch']
           source_ci = yaml.safe_load(Path('.github/workflows/autodev-continuation-ci.yml').read_text())
           assert source_ci['jobs']['tests']['needs'] == 'validate'
+          assert source_ci['jobs']['report']['needs'] == ['validate', 'tests']
+          assert source_ci['jobs']['report']['permissions']['contents'] == 'write'
+          assert source_ci['jobs']['next_workorder']['needs'] == 'report'
+          assert source_ci['jobs']['verify_direct_next']['permissions']['contents'] == 'read'
+          assert 'environment' not in source_ci['jobs']['report']
           assert source_ci['jobs']['tests']['permissions']['contents'] == 'read'
           assert 'environment' not in source_ci['jobs']['tests']
           assert "secrets.OPENAI_API_KEY" not in str(source_ci)
