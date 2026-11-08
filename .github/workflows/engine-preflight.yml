@@ -1,0 +1,23 @@
+name: Portable Autodev Engine PR preflight (NO AI)
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'engine/**'
+      - '.github/workflows/engine-preflight.yml'
+permissions:
+  contents: read
+jobs:
+  test-controller:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - run: node --test engine/controller.test.cjs
+      - name: Assert no AI credentials in this workflow
+        run: |
+          if grep -Ei 'secrets\.|openai-api-key|codex-action|issues: write|contents: write' .github/workflows/engine-preflight.yml; then exit 1; fi
+          echo 'Read-only, zero-secret preflight only'
