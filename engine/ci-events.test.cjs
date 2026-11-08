@@ -157,9 +157,9 @@ test('trusted on-main dispatch CI maps verified PR source SHA, including red tes
     const e=evidence(conclusion,78000);
     const sha='e'.repeat(40);
     e.run.event='workflow_dispatch';
-    e.run.name='Autodev synthetic continuation CI';
+    e.run.name='autodev-continuation-'+HEAD;
     e.run.path='.github/workflows/autodev-continuation-ci.yml';
-    e.run.workflow_id=993311;
+    e.run.workflow_id=411104907;
     e.run.head_branch='main';
     e.run.head_sha=sha;
     e.run.display_title='autodev-continuation-'+HEAD;
@@ -179,7 +179,7 @@ test('dispatch with failed scope validation cannot masquerade as repairable red 
   e.run.event='workflow_dispatch';
   e.run.name='Autodev synthetic continuation CI';
   e.run.path='.github/workflows/autodev-continuation-ci.yml';
-  e.run.workflow_id=993311;
+  e.run.workflow_id=411104907;
   e.run.head_branch='main';e.run.head_sha=sha;
   e.payloadRun.head_sha=sha;e.run.display_title='autodev-continuation-'+HEAD;
   e.jobs=[
@@ -194,4 +194,24 @@ test('dispatch with failed scope validation cannot masquerade as repairable red 
   e.run.display_title='autodev-continuation-'+HEAD;
   e.run.head_branch='pilot/synthetic-v1';
   assert.throws(()=>verifyCompletedCI(e),/trusted main source/);
+});
+
+test('GitHub dynamic workflow run-name is tied to exact source and verified workflow ID',()=>{
+  const e=evidence('failure',78562194);
+  const main='9dbcd3d923d9204637739783b3c1e2b9f3fe5c0b';
+  e.run.event='workflow_dispatch';
+  e.run.name='autodev-continuation-'+HEAD;
+  e.run.display_title='autodev-continuation-'+HEAD;
+  e.run.path='.github/workflows/autodev-continuation-ci.yml';
+  e.run.workflow_id=411104907;
+  e.run.head_branch='main';e.run.head_sha=main;e.run.pull_requests=[];
+  e.payloadRun.head_sha=main;
+  e.jobs=[{name:'Validate exact continuation target',conclusion:'success'},
+    {name:'Run trusted acceptance cases without credentials',conclusion:'failure'}];
+  assert.equal(verifyCompletedCI(e).sha,HEAD);
+  e.run.workflow_id=999999;
+  assert.throws(()=>verifyCompletedCI(e),/trusted continuation CI/);
+  e.run.workflow_id=411104907;
+  e.run.name='autodev-continuation-'+('f'.repeat(40));
+  assert.throws(()=>verifyCompletedCI(e),/trusted continuation CI/);
 });
