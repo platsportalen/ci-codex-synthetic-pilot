@@ -114,3 +114,16 @@ test('wrong GitHub workflow run cannot consume another reservation',async()=>{
   await assert.rejects(()=>verifyReservedStep({github:a.gh,context:a.context,
     receipt:a.receipt,runId:99999}),/reservation identity/);
 });
+
+test('dispatched CI binds the source to PR SHA, not the main workflow SHA',()=>{
+  const {assertSyntheticScope}=require('./paid-runner.cjs');
+  const a=rig(), mainSha='f'.repeat(40);
+  a.context.payload.workflow_run={
+    id:RUN,event:'workflow_dispatch',head_branch:'main',head_sha:mainSha,
+    display_title:'autodev-continuation-'+HEAD,
+    status:'completed',conclusion:'success'
+  };
+  assert.doesNotThrow(()=>assertSyntheticScope(order,a.receipt,a.context));
+  a.context.payload.workflow_run.display_title='autodev-continuation-'+'0'.repeat(40);
+  assert.throws(()=>assertSyntheticScope(order,a.receipt,a.context),/source.controller binding/);
+});
