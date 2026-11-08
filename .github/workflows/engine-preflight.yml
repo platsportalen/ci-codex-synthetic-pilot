@@ -45,6 +45,11 @@ jobs:
           assert 'environment' not in jobs['integrate_patch']
           source_ci = yaml.safe_load(Path('.github/workflows/autodev-continuation-ci.yml').read_text())
           assert source_ci['jobs']['tests']['needs'] == 'validate'
+          assert "always()" in source_ci['jobs']['report']['if']
+          assert "always()" in source_ci['jobs']['next_workorder']['if']
+          assert "always()" in source_ci['jobs']['verify_direct_next']['if']
+          assert source_ci['jobs']['next_workorder']['needs'] == 'report'
+          assert source_ci['jobs']['verify_direct_next']['needs'] == ['report', 'next_workorder']
           assert source_ci['jobs']['report']['needs'] == ['validate', 'tests']
           assert source_ci['jobs']['report']['permissions']['contents'] == 'write'
           assert source_ci['jobs']['next_workorder']['needs'] == 'report'
