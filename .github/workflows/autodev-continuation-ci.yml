@@ -130,7 +130,7 @@ jobs:
     name: Continue repair or next step without a timer (NO AI)
     needs: report
     if: >-
-      needs.report.result == 'success' &&
+      always() && needs.report.result == 'success' &&
       (needs.report.outputs.phase == 'REPAIRING' ||
        needs.report.outputs.phase == 'CODING')
     runs-on: ubuntu-24.04
@@ -173,6 +173,9 @@ jobs:
   verify_direct_next:
     name: Independently validate new work order (NO API SECRET)
     needs: [report, next_workorder]
+    if: >-
+      always() && needs.report.result == 'success' &&
+      needs.next_workorder.result == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
