@@ -50,8 +50,8 @@ test('cannot forge acceptance as customer or production release',()=>{
     {sourceRunId:2},{verification:'CI_GREEN_ONLY'}
   ]) assert.throws(()=>acceptSyntheticDelivery(order,x.state,{...proof,...alteration}));
 });
-test('terminal event is not accepted twice',()=>{
+test('replayed final acceptance is idempotent and cannot create a new delivery',()=>{
   const x=rig();const proof=verifySyntheticDelivery(x);
   const done=acceptSyntheticDelivery(order,x.state,proof);
-  assert.throws(()=>acceptSyntheticDelivery(order,done,proof),/terminal task/);
+  assert.strictEqual(acceptSyntheticDelivery(order,done,proof),done);
 });
