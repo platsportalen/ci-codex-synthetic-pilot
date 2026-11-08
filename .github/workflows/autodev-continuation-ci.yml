@@ -1,5 +1,4 @@
 name: Autodev synthetic continuation CI
-run-name: autodev-continuation-${{ inputs.expected_sha }}
 on:
   workflow_dispatch:
     inputs:
@@ -55,7 +54,16 @@ jobs:
             if(state.taskId!==order.taskId||state.repository!==order.repository||
               state.phase!=='TESTING'||state.headSha!==sha)
               throw Error('Task state not ready for source CI');
+            const proof={version:1,repository:order.repository,taskId:order.taskId,
+              pr:1,sha,runId:context.runId,controllerSha:context.sha};
+            fs.mkdirSync('proof',{recursive:true});
+            fs.writeFileSync('proof/validated-source.json',JSON.stringify(proof,null,2)+'\n');
             core.info('Approved exact source CI target '+sha);
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: autodev-validated-${{ github.run_id }}
+          path: proof/validated-source.json
+          retention-days: 3
   tests:
     name: Run trusted acceptance cases without credentials
     needs: validate
