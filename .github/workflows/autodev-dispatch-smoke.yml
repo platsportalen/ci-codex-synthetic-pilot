@@ -1,0 +1,46 @@
+name: Autodev smoke trigger for trusted continuation CI (NO AI)
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'engine/DISPATCH_SMOKE_TRIGGER.md'
+permissions:
+  contents: read
+concurrency:
+  group: autodev-one-synthetic-dispatch-smoke
+  cancel-in-progress: false
+jobs:
+  dispatch:
+    name: Dispatch exact synthetic PR SHA once (NO API KEY)
+    if: github.repository == 'platsportalen/ci-codex-synthetic-pilot' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Check synthetic task is explicitly staged for a no-cost red CI
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
+        with:
+          script: |
+            const order=require('./engine/pilot-order.json');
+            if(Number(process.env.GITHUB_RUN_ATTEMPT)!==1)throw Error('No automatic retry');
+            const {data:pr}=await github.rest.pulls.get({...context.repo,pull_number:1});
+            const {data:file}=await github.rest.repos.getContent({
+              ...context.repo,path:'state/pilot_task_1.json',ref:'autodev-state'});
+            if(file.type!=='file'||file.encoding!=='base64'||file.size>16384)
+              throw Error('Invalid pilot state');
+            const state=JSON.parse(Buffer.from(file.content,'base64').toString('utf8'));
+            if(pr.state!=='open'||pr.head.ref!=='pilot/synthetic-v1'||
+              pr.head.repo.id!==1449650612||state.taskId!==order.taskId||
+              state.phase!=='TESTING'||state.headSha!==pr.head.sha||
+              state.stepIndex!==1)throw Error('Synthetic test not staged');
+            await github.rest.actions.createWorkflowDispatch({
+              ...context.repo,workflow_id:'autodev-continuation-ci.yml',
+              ref:'main',inputs:{task_id:order.taskId,expected_sha:pr.head.sha}});
+            core.info('Explicit no-secret CI smoke dispatch '+pr.head.sha);
