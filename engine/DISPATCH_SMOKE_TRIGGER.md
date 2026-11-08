@@ -7,3 +7,5 @@ Second bounded smoke after PR #15: verify dispatched red CI reaches REPAIRING. N
 Third exact synthetic red CI smoke after PR #17: dynamic run-name subscription and receiver verification; no AI.
 
 Fourth red CI smoke: direct report and next scoped workorder, post PR #19; no AI.
+
+Fifth bounded smoke: verify repair workorder artifact after intentional red CI and fix PR #20. No model call.
