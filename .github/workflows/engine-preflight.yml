@@ -19,3 +19,23 @@ jobs:
       - run: node --test engine/*.test.cjs
       - name: Confirm isolated no-secret validation
         run: echo 'Read-only task controller regression tests completed'
+      - name: Parse trusted event workflow and check paid-job gates
+        run: |
+          python -m pip install 'PyYAML==6.0.3'
+          python - <<'PY'
+          from pathlib import Path
+          import yaml
+          wf = yaml.safe_load(Path('.github/workflows/engine-ci-event.yml').read_text())
+          jobs = wf['jobs']
+          assert 'reserve_paid' in jobs and 'codex_paid' in jobs and 'verify_codex_paid' in jobs
+          assert "AUTODEV_PAID_V1_ENABLED == 'true'" in jobs['reserve_paid']['if']
+          assert jobs['codex_paid']['environment'] == 'synthetic-pilot-approval'
+          assert jobs['codex_paid']['needs'] == ['decide', 'reserve_paid']
+          assert jobs['codex_paid']['permissions']['contents'] == 'read'
+          assert jobs['verify_codex_paid']['needs'] == ['decide', 'codex_paid']
+          assert 'environment' not in jobs['verify_codex_paid']
+          assert jobs['reserve_paid']['permissions']['contents'] == 'write'
+          assert "secrets.OPENAI_API_KEY" not in str(jobs['reserve_paid'])
+          assert "secrets.OPENAI_API_KEY" not in str(jobs['verify_codex_paid'])
+          print('AI remains gated; key only enters isolated protected job')
+          PY

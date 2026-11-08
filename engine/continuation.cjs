@@ -27,7 +27,7 @@ function createWorkOrder(order,state,{sourceRunId,controllerSha,stateSha}){
     phase:state.phase,stepIndex:state.stepIndex,stepId:step.id,
     repairAttempt:state.repairs,allowedPaths:[...step.allowedPaths],
     acceptance:[...step.acceptance],
-    action:'PROPOSE_PATCH_ONLY_NO_AI'
+    action:'PROPOSE_PATCH'
   };
 }
 function verifyWorkOrder(order,receipt,{sourceRunId,sourceSha,controllerSha}){
@@ -51,7 +51,7 @@ function verifyWorkOrder(order,receipt,{sourceRunId,sourceSha,controllerSha}){
     JSON.stringify(receipt.allowedPaths)===JSON.stringify(expected.allowedPaths) &&
     JSON.stringify(receipt.acceptance)===JSON.stringify(expected.acceptance),
     'step manifest integrity');
-  need(receipt.action==='PROPOSE_PATCH_ONLY_NO_AI','no elevated action');
+  need(receipt.action==='PROPOSE_PATCH','no elevated action');
   return true;
 }
 if(require.main===module){

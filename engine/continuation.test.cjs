@@ -13,7 +13,7 @@ function check(receipt){return verifyWorkOrder(order,receipt,{
 test('creates exact next-step manifest from approved persisted task phase',()=>{
   const x=make();assert.equal(x.stepId,'final_verification');
   assert.equal(x.sourceRunId,CI);assert.deepEqual(x.allowedPaths,order.steps[1].allowedPaths);
-  assert.equal(x.action,'PROPOSE_PATCH_ONLY_NO_AI');assert.equal(check(x),true);
+  assert.equal(x.action,'PROPOSE_PATCH');assert.equal(check(x),true);
 });
 test('creates a repair assignment only inside explicitly approved repair boundary',()=>{
   const s={...state(),phase:'REPAIRING',repairs:1,stepIndex:0};
