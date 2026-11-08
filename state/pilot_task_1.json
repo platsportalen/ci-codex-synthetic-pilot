@@ -1,14 +1,15 @@
 {
   "taskId": "pilot_task_1",
   "repository": "platsportalen/ci-codex-synthetic-pilot",
-  "phase": "CODING",
-  "headSha": "f9059eb49f05e66bc352fcb813c76a1b33db6391",
+  "phase": "TESTING",
+  "headSha": "5968c5ce6e686b92f1d1f96c97a057a5a62c0abf",
   "stepIndex": 1,
   "repairs": 0,
   "seenEventIds": [
     "bootstrap_start",
     "bootstrap_patch",
-    "ci_42472850043"
+    "ci_42472850043",
+    "synthetic_patch2_ready"
   ],
   "seenCiRunIds": [
     42472850043
