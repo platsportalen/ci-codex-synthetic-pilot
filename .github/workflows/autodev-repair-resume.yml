@@ -1,0 +1,109 @@
+name: Autodev resume one stalled synthetic repair
+on:
+  workflow_dispatch:
+    inputs:
+      task_id:
+        description: Exact synthetic pilot task ID
+        type: string
+        required: true
+      source_run_id:
+        description: Exact already-verified red CI run ID
+        type: string
+        required: true
+      expected_sha:
+        description: Exact current synthetic PR head SHA
+        type: string
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: autodev-recovery-single-synthetic-step
+  cancel-in-progress: false
+jobs:
+  validate:
+    name: Validate stalled repair and produce exact work order (NO AI)
+    if: github.repository == 'platsportalen/ci-codex-synthetic-pilot' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - run: node --test engine/*.test.cjs
+      - name: Re-fetch source run, PR, exact state and verified failing tests
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
+        env:
+          TASK_ID: ${{ inputs.task_id }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        with:
+          script: |
+            const fs=require('node:fs');
+            const {createRecoveryReceipt}=require('./engine/recover-stalled.cjs');
+            const receipt=await createRecoveryReceipt({github,context,
+              taskId:process.env.TASK_ID,sourceRunId:Number(process.env.SOURCE_RUN_ID),
+              sourceSha:process.env.EXPECTED_SHA});
+            fs.mkdirSync('next-step',{recursive:true});
+            fs.writeFileSync('next-step/workorder.json',JSON.stringify(receipt,null,2)+'\n');
+            core.info('Authorized recovery only for CI '+receipt.sourceRunId);
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: autodev-recover-next-${{ github.run_id }}
+          path: next-step/workorder.json
+          retention-days: 3
+  verify_next:
+    name: Independently check recovery work order (NO API KEY)
+    needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: autodev-recover-next-${{ github.run_id }}
+          path: incoming
+      - name: Verify source CI and exact bounded scope independently
+        env:
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+          SOURCE_HEAD_SHA: ${{ inputs.expected_sha }}
+          CONTROLLER_SHA: ${{ github.sha }}
+        run: node engine/continuation.cjs verify incoming/workorder.json
+  reserve_paid:
+    name: Reserve recovered Codex pass (NO API SECRET)
+    needs: [validate, verify_next]
+    if: >-
+      needs.verify_next.result == 'success' &&
+      vars.AUTODEV_PAID_V1_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: autodev-recover-next-${{ github.run_id }}
+          path: incoming
+      - name: Create-only reservation for exact failed CI
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
+        with:
+          script: |
+            const fs=require('node:fs');
+            const {reserveRecovery}=require('./engine/recover-stalled.cjs');
+            const receipt=JSON.parse(fs.readFileSync('incoming/workorder.json','utf8'));
+            await reserveRecovery({github,context,receipt});
