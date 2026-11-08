@@ -42,8 +42,11 @@ function applyDataOnlyPatch(sourceBytes,patchBytes){
 }
 
 async function publishVerifiedPatch({github,context,receipt,patchBytes,core,
-  order=require('./pilot-order.json'),runId}){
-  await verifyReservedStep({github,context,receipt,order,runId});
+  order=require('./pilot-order.json'),runId,
+  verifyReservation=verifyReservedStep}){
+  // The trusted calling workflow selects one of two strict reservation
+  // guards: completed PR CI or directly verified in-progress workflow_dispatch.
+  await verifyReservation({github,context,receipt,order,runId});
   need(Number.isSafeInteger(runId)&&runId>0&&
     Number(process.env.GITHUB_RUN_ATTEMPT)===1,'workflow run attempt');
   const {data:currentPR}=await github.rest.pulls.get({
