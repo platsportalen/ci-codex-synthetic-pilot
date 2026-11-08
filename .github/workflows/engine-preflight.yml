@@ -80,5 +80,25 @@ jobs:
           assert "secrets.OPENAI_API_KEY" not in str(jobs['integrate_patch'])
           assert "secrets.OPENAI_API_KEY" not in str(jobs['reserve_paid'])
           assert "secrets.OPENAI_API_KEY" not in str(jobs['verify_codex_paid'])
+          recovery = yaml.safe_load(Path('.github/workflows/autodev-repair-resume.yml').read_text())
+          rj = recovery['jobs']
+          assert rj['reserve_paid']['if'].find("AUTODEV_PAID_V1_ENABLED == 'true'") >= 0
+          assert rj['reserve_paid']['permissions']['contents'] == 'write'
+          assert rj['codex_paid']['environment'] == 'synthetic-pilot-approval'
+          assert rj['codex_paid']['needs'] == ['validate', 'reserve_paid']
+          assert rj['codex_paid']['permissions']['contents'] == 'read'
+          assert rj['verify_codex']['needs'] == ['validate', 'codex_paid']
+          assert rj['verify_codex']['permissions']['contents'] == 'read'
+          assert rj['integrate']['needs'] == ['validate', 'codex_paid', 'verify_codex']
+          assert rj['integrate']['permissions']['contents'] == 'write'
+          assert rj['integrate']['permissions']['actions'] == 'write'
+          for name in ('validate','verify_next','reserve_paid','verify_codex','integrate'):
+              assert 'environment' not in rj[name]
+              assert 'secrets.OPENAI_API_KEY' not in str(rj[name])
+          assert 'secrets.OPENAI_API_KEY' in str(rj['codex_paid'])
+          assert 'verifyRecoveryReservation' in str(rj['integrate'])
+          assert 'verifyRecoveryReservation' in str(rj['codex_paid'])
+          assert 'autodev-recover-next-' in str(rj['integrate'])
+          assert 'autodev-recover-next-' in str(rj['codex_paid'])
           print('AI remains gated; key only enters isolated protected job')
           PY
