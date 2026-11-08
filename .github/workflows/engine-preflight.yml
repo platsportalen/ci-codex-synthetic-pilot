@@ -16,6 +16,6 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           persist-credentials: false
-      - run: node --test engine/controller.test.cjs
+      - run: node --test engine/*.test.cjs
       - name: Confirm isolated no-secret validation
         run: echo 'Read-only task controller regression tests completed'
