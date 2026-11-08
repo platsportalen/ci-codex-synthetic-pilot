@@ -4,6 +4,7 @@ const {advance,validateOrder}=require('./controller.cjs');
 const SHA=/^[a-f0-9]{40}$/;
 const CONTINUATION=Object.freeze({
   name:'Autodev synthetic continuation CI',
+  workflowId:411104907,
   path:'.github/workflows/autodev-continuation-ci.yml',
   validateJob:'Validate exact continuation target',
   testsJob:'Run trusted acceptance cases without credentials',
@@ -43,8 +44,10 @@ function verifyCompletedCI({repository,pr,run,payloadRun,attempt,order,jobs}){
   }else if(run.event==='workflow_dispatch'){
     // The trusted workflow definition lives on main and tests PR source as data.
     // GitHub run.head_sha is MAIN SHA, not the PR SHA in this event type.
-    need(run.name===CONTINUATION.name&&run.path===CONTINUATION.path &&
-      Number.isSafeInteger(run.workflow_id)&&run.workflow_id>0,
+    need((run.name===CONTINUATION.name ||
+      run.name==='autodev-continuation-'+pr.head.sha) &&
+      run.workflow_id===CONTINUATION.workflowId &&
+      run.path===CONTINUATION.path,
       'trusted continuation CI');
     need(run.head_branch==='main'&&SHA.test(run.head_sha||'') &&
       payloadRun.head_sha===run.head_sha,'trusted main source');
