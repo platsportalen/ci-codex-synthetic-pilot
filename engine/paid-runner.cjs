@@ -15,7 +15,7 @@ function assertSyntheticScope(order,receipt,context){
     context.repo.repo==='ci-codex-synthetic-pilot' &&
     context.ref==='refs/heads/main' && SHA.test(context.sha||''),'trusted controller');
   need(receipt?.stepId==='final_verification' && receipt.stepIndex===1 &&
-    receipt.phase==='CODING' && receipt.action==='PROPOSE_PATCH_ONLY_NO_AI',
+    receipt.phase==='CODING' && receipt.action==='PROPOSE_PATCH',
     'pilot single approved work step');
   need(receipt.allowedPaths.includes('lab/sample.py') &&
     receipt.allowedPaths.length<=2 &&
