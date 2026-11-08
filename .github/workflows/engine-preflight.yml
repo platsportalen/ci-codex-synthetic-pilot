@@ -51,6 +51,22 @@ jobs:
           assert 'always()' in source_ci['jobs']['next_workorder']['if']
           assert 'always()' in source_ci['jobs']['verify_direct_next']['if']
           assert source_ci['jobs']['verify_direct_next']['permissions']['contents'] == 'read'
+          assert "always()" in source_ci['jobs']['direct_reserve']['if']
+          assert "AUTODEV_PAID_V1_ENABLED == 'true'" in source_ci['jobs']['direct_reserve']['if']
+          assert source_ci['jobs']['direct_reserve']['needs'] == ['report', 'next_workorder', 'verify_direct_next']
+          assert source_ci['jobs']['direct_reserve']['permissions']['contents'] == 'write'
+          assert source_ci['jobs']['direct_codex']['environment'] == 'synthetic-pilot-approval'
+          assert source_ci['jobs']['direct_codex']['needs'] == ['report', 'direct_reserve']
+          assert "always()" in source_ci['jobs']['direct_codex']['if']
+          assert source_ci['jobs']['direct_verify_codex']['needs'] == ['report', 'direct_codex']
+          assert source_ci['jobs']['direct_verify_codex']['permissions']['contents'] == 'read'
+          assert source_ci['jobs']['direct_integrate']['needs'] == ['report', 'direct_codex', 'direct_verify_codex']
+          assert source_ci['jobs']['direct_integrate']['permissions']['actions'] == 'write'
+          assert source_ci['jobs']['direct_integrate']['permissions']['contents'] == 'write'
+          for job in ['direct_reserve', 'direct_verify_codex', 'direct_integrate']:
+              assert 'environment' not in source_ci['jobs'][job]
+              assert 'OPENAI_API_KEY' not in str(source_ci['jobs'][job])
+          assert 'secrets.OPENAI_API_KEY' in str(source_ci['jobs']['direct_codex'])
           assert 'environment' not in source_ci['jobs']['report']
           assert source_ci['jobs']['tests']['permissions']['contents'] == 'read'
           assert 'environment' not in source_ci['jobs']['tests']
