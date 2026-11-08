@@ -50,6 +50,7 @@ function advance(order, state, event) {
   requireValid(state.headSha && SHA.test(state.headSha), 'state SHA');
   requireValid(event.sha === state.headSha, 'stale or foreign SHA');
   let phase = state.phase, stepIndex=state.stepIndex, repairs=state.repairs;
+  let blocker=state.blocker||null;
   let headSha=state.headSha;
   const seenCiRunIds=[...state.seenCiRunIds];
   switch(event.type) {
@@ -67,8 +68,12 @@ function advance(order, state, event) {
       requireValid(event.conclusion==='success'||event.conclusion==='failure', 'CI outcome');
       seenCiRunIds.push(event.runId);
       if (event.conclusion==='failure') {
-        if (repairs >= order.maxRepairs) phase='BLOCKED';
-        else { repairs++; phase='REPAIRING'; }
+        if (repairs >= order.maxRepairs) {
+          phase='BLOCKED';
+          blocker={code:'CI_REPAIR_LIMIT',stepId:order.steps[stepIndex].id,
+            sha:state.headSha,sourceRunId:event.runId,attempts:repairs,
+            recommendation:'Inspect the failing CI and revise the task or unblock safely.'};
+        }else { repairs++; phase='REPAIRING'; }
       } else if (stepIndex + 1 < order.steps.length) {
         stepIndex++; repairs=0; phase='CODING';
       } else phase='REVIEW';
@@ -77,10 +82,14 @@ function advance(order, state, event) {
       requireValid(phase==='REVIEW' && event.accepted===true, 'acceptance');
       phase='DONE'; break;
     case 'HALT':
-      phase='BLOCKED'; break;
+      phase='BLOCKED';
+      blocker={code:'OPERATOR_HALT',stepId:order.steps[stepIndex]?.id||'unknown',
+        sha:state.headSha,sourceRunId:null,attempts:repairs,
+        recommendation:'Explicit owner review before resuming this task.'};
+      break;
     default: throw Error('AUTODEV_DENIED: unknown event');
   }
-  return Object.freeze({...state,phase,headSha,stepIndex,repairs,
+  return Object.freeze({...state,phase,headSha,stepIndex,repairs,blocker,
     seenEventIds:[...state.seenEventIds,event.eventId],seenCiRunIds});
 }
 
