@@ -6,6 +6,8 @@ on:
     paths:
       - 'engine/**'
       - '.github/workflows/engine-preflight.yml'
+      - '.github/workflows/engine-ci-event.yml'
+      - '.github/workflows/autodev-continuation-ci.yml'
       - '.github/workflows/autodev-dispatch-smoke.yml'
 permissions:
   contents: read
@@ -27,6 +29,9 @@ jobs:
           from pathlib import Path
           import yaml
           wf = yaml.safe_load(Path('.github/workflows/engine-ci-event.yml').read_text())
+          triggers=wf.get('on',wf.get(True))
+          assert set(triggers['workflow_run']['workflows']) == {
+              'Synthetic CI pipeline', 'Autodev synthetic continuation CI'}
           jobs = wf['jobs']
           assert 'reserve_paid' in jobs and 'codex_paid' in jobs and 'verify_codex_paid' in jobs
           assert "AUTODEV_PAID_V1_ENABLED == 'true'" in jobs['reserve_paid']['if']
