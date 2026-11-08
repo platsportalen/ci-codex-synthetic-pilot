@@ -10,7 +10,7 @@ function pathFor(receipt){
     Number.isSafeInteger(receipt.sourceRunId) && receipt.sourceRunId>0,'bounded reservation path');
   return 'state/paid/'+receipt.taskId+'/source-'+receipt.sourceRunId+'.json';
 }
-function assertSyntheticScope(order,receipt,context){
+function assertSyntheticScope(order,receipt,context,sourceEvidence){
   need(context?.repo?.owner==='platsportalen' &&
     context.repo.repo==='ci-codex-synthetic-pilot' &&
     context.ref==='refs/heads/main' && SHA.test(context.sha||''),'trusted controller');
@@ -25,7 +25,11 @@ function assertSyntheticScope(order,receipt,context){
     'work order identity');
   const source=context.payload?.workflow_run;
   const sourceBound=source?.event==='workflow_dispatch'
-    ?(source.display_title==='autodev-continuation-'+receipt.sourceSha &&
+    ?(sourceEvidence?.version===1 && sourceEvidence.repository===order.repository &&
+      sourceEvidence.taskId===order.taskId && sourceEvidence.pr===order.source.pr &&
+      sourceEvidence.runId===receipt.sourceRunId &&
+      sourceEvidence.sha===receipt.sourceSha &&
+      sourceEvidence.controllerSha===source.head_sha &&
       source.head_branch==='main')
     :(source?.head_sha===receipt.sourceSha);
   need(receipt.sourceRunId===source?.id && sourceBound &&
@@ -36,8 +40,8 @@ function assertSyntheticScope(order,receipt,context){
 }
 /* This is the ONLY credential-free job allowed to write a paid-step reservation.
    Any existing path aborts; never overwrite a reserved step. */
-async function reserveStep({github,context,receipt,order=require('./pilot-order.json'),runId}){
-  assertSyntheticScope(order,receipt,context);
+async function reserveStep({github,context,receipt,sourceEvidence,order=require('./pilot-order.json'),runId}){
+  assertSyntheticScope(order,receipt,context,sourceEvidence);
   need(Number.isSafeInteger(runId)&&runId>0,'current workflow ID');
   need(Number(process.env.GITHUB_RUN_ATTEMPT)===1,'workflow rerun disallowed');
   const {data:main}=await github.rest.git.getRef({...context.repo,ref:'heads/main'});
@@ -50,7 +54,7 @@ async function reserveStep({github,context,receipt,order=require('./pilot-order.
       ...context.repo,run_id:run.id,per_page:100,filter:'latest'})
     :undefined;
   verifyCompletedCI({repository:context.payload.repository,pr,run,
-    payloadRun:context.payload.workflow_run,attempt:1,order,jobs});
+    payloadRun:context.payload.workflow_run,attempt:1,order,jobs,sourceEvidence});
   const {data:blob}=await github.rest.repos.getContent({
     ...context.repo,path:STATE_PATH,ref:STATE_BRANCH});
   need(blob.type==='file'&&blob.encoding==='base64' &&
@@ -76,8 +80,8 @@ async function reserveStep({github,context,receipt,order=require('./pilot-order.
 }
 /* Run as the FIRST step inside the protected-Environment job, before API key use.
    Rechecks exact reservation, controller SHA, PR head, state and source CI. */
-async function verifyReservedStep({github,context,receipt,order=require('./pilot-order.json'),runId}){
-  assertSyntheticScope(order,receipt,context);
+async function verifyReservedStep({github,context,receipt,sourceEvidence,order=require('./pilot-order.json'),runId}){
+  assertSyntheticScope(order,receipt,context,sourceEvidence);
   need(Number.isSafeInteger(runId)&&runId>0,'current run');
   need(Number(process.env.GITHUB_RUN_ATTEMPT)===1,'workflow rerun disallowed');
   const {data:main}=await github.rest.git.getRef({...context.repo,ref:'heads/main'});
@@ -106,7 +110,7 @@ async function verifyReservedStep({github,context,receipt,order=require('./pilot
       ...context.repo,run_id:sourceRun.id,per_page:100,filter:'latest'})
     :undefined;
   verifyCompletedCI({repository:context.payload.repository,pr,run:sourceRun,
-    payloadRun:context.payload.workflow_run,attempt:1,order,jobs});
+    payloadRun:context.payload.workflow_run,attempt:1,order,jobs,sourceEvidence});
   need(pr.head.sha===receipt.sourceSha,'PR moved');
   return expected;
 }
