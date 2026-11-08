@@ -61,6 +61,7 @@ async function processCI({github,context,core,order=require('./pilot-order.json'
     repairs:after.repairs,duplicate};
   core.setOutput('phase',after.phase);
   core.setOutput('source_run_id',String(verified.runId));
+  core.setOutput('source_sha',verified.sha);
   core.info('Trusted autonomous task decision: '+JSON.stringify(result));
   return result;
 }
