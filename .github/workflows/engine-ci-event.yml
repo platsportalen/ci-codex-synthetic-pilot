@@ -14,10 +14,12 @@ jobs:
     name: Verify CI and persist bounded next step
     if: >-
       github.repository == 'platsportalen/ci-codex-synthetic-pilot' &&
-      github.event.workflow_run.event == 'pull_request' &&
+      ((github.event.workflow_run.event == 'pull_request' &&
+        github.event.workflow_run.head_branch == 'pilot/synthetic-v1') ||
+       (github.event.workflow_run.event == 'workflow_dispatch' &&
+        github.event.workflow_run.head_branch == 'main')) &&
       (github.event.workflow_run.conclusion == 'success' ||
        github.event.workflow_run.conclusion == 'failure') &&
-      github.event.workflow_run.head_branch == 'pilot/synthetic-v1' &&
       github.run_attempt == 1
     runs-on: ubuntu-24.04
     timeout-minutes: 5
