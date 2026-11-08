@@ -122,3 +122,32 @@ test('trusted receiver rejects invalid CI before any persistent mutation',async(
   }finally{if(prior===undefined)delete process.env.GITHUB_RUN_ATTEMPT;else process.env.GITHUB_RUN_ATTEMPT=prior;}
   assert.equal(writes.length,0);
 });
+
+test('red CI is durably recorded as REPAIRING without an AI call',async()=>{
+  const e=evidence('failure',66001),{github,writes}=fakeGitHub(e,testingState());
+  const old=process.env.GITHUB_RUN_ATTEMPT;process.env.GITHUB_RUN_ATTEMPT='1';
+  try {
+    const d=await processCI({github,context:contextFor(e),core:{setOutput(){},info(){}}});
+    assert.equal(d.after,'REPAIRING');assert.equal(d.repairs,1);
+    const saved=JSON.parse(Buffer.from(writes[0].content,'base64').toString('utf8'));
+    assert.equal(saved.phase,'REPAIRING');assert.equal(saved.seenCiRunIds[0],66001);
+  }finally{if(old===undefined)delete process.env.GITHUB_RUN_ATTEMPT;else process.env.GITHUB_RUN_ATTEMPT=old;}
+});
+test('receiver does not issue a second state write for same completed CI',async()=>{
+  const e=evidence('success',67001);
+  const already=applyVerifiedCI(order,testingState(),verifyCompletedCI(e));
+  const {github,writes}=fakeGitHub(e,already);
+  const old=process.env.GITHUB_RUN_ATTEMPT;process.env.GITHUB_RUN_ATTEMPT='1';
+  try{
+    const d=await processCI({github,context:contextFor(e),core:{setOutput(){},info(){}}});
+    assert.equal(d.duplicate,true);assert.equal(writes.length,0);
+  }finally{if(old===undefined)delete process.env.GITHUB_RUN_ATTEMPT;else process.env.GITHUB_RUN_ATTEMPT=old;}
+});
+test('state CAS write conflicts fail closed without pretending success',async()=>{
+  const e=evidence(),{github}=fakeGitHub(e,testingState());
+  github.rest.repos.createOrUpdateFileContents=async()=>{throw Error('409 conflict');};
+  const old=process.env.GITHUB_RUN_ATTEMPT;process.env.GITHUB_RUN_ATTEMPT='1';
+  try {
+    await assert.rejects(()=>processCI({github,context:contextFor(e),core:{setOutput(){},info(){}}}),/409 conflict/);
+  }finally{if(old===undefined)delete process.env.GITHUB_RUN_ATTEMPT;else process.env.GITHUB_RUN_ATTEMPT=old;}
+});
