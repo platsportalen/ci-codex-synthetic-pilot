@@ -120,10 +120,11 @@ test('dispatched CI binds the source to PR SHA, not the main workflow SHA',()=>{
   const a=rig(), mainSha='f'.repeat(40);
   a.context.payload.workflow_run={
     id:RUN,event:'workflow_dispatch',head_branch:'main',head_sha:mainSha,
-    display_title:'autodev-continuation-'+HEAD,
     status:'completed',conclusion:'success'
   };
-  assert.doesNotThrow(()=>assertSyntheticScope(order,a.receipt,a.context));
-  a.context.payload.workflow_run.display_title='autodev-continuation-'+'0'.repeat(40);
-  assert.throws(()=>assertSyntheticScope(order,a.receipt,a.context),/source.controller binding/);
+  const proof={version:1,repository:order.repository,taskId:order.taskId,
+    pr:1,runId:RUN,sha:HEAD,controllerSha:mainSha};
+  assert.doesNotThrow(()=>assertSyntheticScope(order,a.receipt,a.context,proof));
+  assert.throws(()=>assertSyntheticScope(order,a.receipt,a.context,
+    {...proof,sha:'0'.repeat(40)}),/source.controller binding/);
 });
