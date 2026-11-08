@@ -2,7 +2,7 @@ name: Autodev pilot trusted CI-to-state receiver (NO AI)
 run-name: autodev-state-source-${{ github.event.workflow_run.id }}
 on:
   workflow_run:
-    workflows: [Synthetic CI pipeline]
+    workflows: [Synthetic CI pipeline, Autodev synthetic continuation CI]
     types: [completed]
 permissions:
   contents: read
