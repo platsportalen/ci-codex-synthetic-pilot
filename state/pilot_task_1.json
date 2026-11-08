@@ -1,0 +1,13 @@
+{
+  "taskId": "pilot_task_1",
+  "repository": "platsportalen/ci-codex-synthetic-pilot",
+  "phase": "TESTING",
+  "headSha": "f9059eb49f05e66bc352fcb813c76a1b33db6391",
+  "stepIndex": 0,
+  "repairs": 0,
+  "seenEventIds": [
+    "bootstrap_start",
+    "bootstrap_patch"
+  ],
+  "seenCiRunIds": []
+}
