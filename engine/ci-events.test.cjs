@@ -159,10 +159,11 @@ test('trusted on-main dispatch CI maps verified PR source SHA, including red tes
     e.run.event='workflow_dispatch';
     e.run.name='Autodev synthetic continuation CI';
     e.run.path='.github/workflows/autodev-continuation-ci.yml';
-    e.run.workflow_id=993311;
+    e.run.workflow_id=411104907;
     e.run.head_branch='main';
     e.run.head_sha=sha;
-    e.run.display_title='autodev-continuation-'+HEAD;
+    e.sourceEvidence={version:1,repository:order.repository,taskId:order.taskId,
+      pr:1,runId:e.run.id,sha:HEAD,controllerSha:sha};
     e.run.pull_requests=[];
     e.payloadRun.head_sha=sha;
     e.jobs=[
@@ -179,9 +180,10 @@ test('dispatch with failed scope validation cannot masquerade as repairable red 
   e.run.event='workflow_dispatch';
   e.run.name='Autodev synthetic continuation CI';
   e.run.path='.github/workflows/autodev-continuation-ci.yml';
-  e.run.workflow_id=993311;
+  e.run.workflow_id=411104907;
   e.run.head_branch='main';e.run.head_sha=sha;
-  e.payloadRun.head_sha=sha;e.run.display_title='autodev-continuation-'+HEAD;
+  e.payloadRun.head_sha=sha;e.sourceEvidence={version:1,repository:order.repository,taskId:order.taskId,
+      pr:1,runId:e.run.id,sha:HEAD,controllerSha:sha};
   e.jobs=[
     {name:'Validate exact continuation target',conclusion:'failure'},
     {name:'Run trusted acceptance cases without credentials',conclusion:'skipped'}
@@ -189,9 +191,10 @@ test('dispatch with failed scope validation cannot masquerade as repairable red 
   assert.throws(()=>verifyCompletedCI(e),/source validation or test provenance/);
   e.jobs[0].conclusion='success';
   e.jobs[1].conclusion='failure';
-  e.run.display_title='autodev-continuation-'+'a'.repeat(40);
-  assert.throws(()=>verifyCompletedCI(e),/dispatch expected source SHA/);
-  e.run.display_title='autodev-continuation-'+HEAD;
+  e.sourceEvidence.sha='a'.repeat(40);
+  assert.throws(()=>verifyCompletedCI(e),/trusted validated-source artifact/);
+  e.sourceEvidence={version:1,repository:order.repository,taskId:order.taskId,
+      pr:1,runId:e.run.id,sha:HEAD,controllerSha:sha};
   e.run.head_branch='pilot/synthetic-v1';
   assert.throws(()=>verifyCompletedCI(e),/trusted main source/);
 });
