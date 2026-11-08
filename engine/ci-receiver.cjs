@@ -29,9 +29,13 @@ async function processCI({github,context,core,order=require('./pilot-order.json'
     ...context.repo,pull_number:order.source.pr});
   const {data:run}=await github.rest.actions.getWorkflowRun({
     ...context.repo,run_id:trigger.id});
+  const jobs=run.event==='workflow_dispatch'
+    ?await github.paginate(github.rest.actions.listJobsForWorkflowRun,{
+      ...context.repo,run_id:run.id,per_page:100,filter:'latest'})
+    :undefined;
   const verified=verifyCompletedCI({
     repository:context.payload.repository,pr,run,payloadRun:trigger,
-    attempt:Number(process.env.GITHUB_RUN_ATTEMPT),order
+    attempt:Number(process.env.GITHUB_RUN_ATTEMPT),order,jobs
   });
   const {data:file}=await github.rest.repos.getContent({
     ...context.repo,path:STATE_PATH,ref:STATE_BRANCH});
