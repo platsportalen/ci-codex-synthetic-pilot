@@ -265,4 +265,4 @@ jobs:
             const receipt=JSON.parse(fs.readFileSync('incoming/workorder.json','utf8'));
             const patchBytes=fs.readFileSync('incoming/codex.patch');
             await publishVerifiedPatch({github,context,receipt,patchBytes,core,
-              runId:context.runId,verifyReservation:verifyDirectReservation});
+              runId:context.runId,verifyReservation:verifyRecoveryReservation});
