@@ -6,6 +6,7 @@ on:
     paths:
       - 'engine/**'
       - '.github/workflows/engine-preflight.yml'
+      - '.github/workflows/autodev-dispatch-smoke.yml'
 permissions:
   contents: read
 jobs:
@@ -44,6 +45,11 @@ jobs:
           assert source_ci['jobs']['tests']['permissions']['contents'] == 'read'
           assert 'environment' not in source_ci['jobs']['tests']
           assert "secrets.OPENAI_API_KEY" not in str(source_ci)
+          smoke = yaml.safe_load(Path('.github/workflows/autodev-dispatch-smoke.yml').read_text())
+          assert smoke['jobs']['dispatch']['permissions']['actions'] == 'write'
+          assert smoke['jobs']['dispatch']['permissions']['contents'] == 'read'
+          assert 'environment' not in smoke['jobs']['dispatch']
+          assert 'OPENAI_API_KEY' not in str(smoke)
           assert "secrets.OPENAI_API_KEY" not in str(jobs['integrate_patch'])
           assert "secrets.OPENAI_API_KEY" not in str(jobs['reserve_paid'])
           assert "secrets.OPENAI_API_KEY" not in str(jobs['verify_codex_paid'])
