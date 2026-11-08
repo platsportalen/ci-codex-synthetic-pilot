@@ -36,6 +36,14 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
+      - name: Read trusted source SHA artifact (dispatched CI only)
+        if: github.event.workflow_run.event == 'workflow_dispatch'
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: autodev-validated-${{ github.event.workflow_run.id }}
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          path: source-evidence
       - name: Test trusted default-branch decision code, no untrusted PR checkout
         run: node --test engine/*.test.cjs
       - name: Re-fetch real PR and run; reject stale, wrong or duplicate source
@@ -45,8 +53,12 @@ jobs:
           script: |
             // Only pinned, trusted default-branch code uses the write token.
             // Never run source-PR scripts, access OpenAI secrets, push or deploy.
+            const fs=require('node:fs');
             const {processCI}=require('./engine/ci-receiver.cjs');
-            await processCI({github,context,core});
+            const sourceEvidence=context.payload.workflow_run.event==='workflow_dispatch'
+              ?JSON.parse(fs.readFileSync('source-evidence/validated-source.json','utf8'))
+              :undefined;
+            await processCI({github,context,core,sourceEvidence});
   next_step:
     name: Generate bounded next-step work order (NO AI)
     needs: decide
@@ -135,6 +147,14 @@ jobs:
         with:
           name: autodev-next-${{ github.run_id }}
           path: incoming
+      - name: Read trusted source SHA artifact (dispatched CI only)
+        if: github.event.workflow_run.event == 'workflow_dispatch'
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: autodev-validated-${{ github.event.workflow_run.id }}
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          path: source-evidence
       - name: Transactionally reserve exact PR, SHA, step and workflow run
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
         with:
@@ -142,7 +162,10 @@ jobs:
             const fs=require('node:fs');
             const {reserveStep}=require('./engine/paid-runner.cjs');
             const receipt=JSON.parse(fs.readFileSync('incoming/workorder.json','utf8'));
-            const reservation=await reserveStep({github,context,receipt,runId:context.runId});
+            const sourceEvidence=context.payload.workflow_run.event==='workflow_dispatch'
+              ?JSON.parse(fs.readFileSync('source-evidence/validated-source.json','utf8'))
+              :undefined;
+            const reservation=await reserveStep({github,context,receipt,sourceEvidence,runId:context.runId});
             core.info('Reserved Codex work step '+reservation.stepId+' for CI '+reservation.sourceRunId);
   codex_paid:
     name: Codex workorder paid pass (protected Environment)
@@ -164,6 +187,14 @@ jobs:
         with:
           name: autodev-next-${{ github.run_id }}
           path: incoming
+      - name: Read trusted source SHA artifact (dispatched CI only)
+        if: github.event.workflow_run.event == 'workflow_dispatch'
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: autodev-validated-${{ github.event.workflow_run.id }}
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          path: source-evidence
       - name: Verify paid reservation, PR and fresh CI before API use
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
         with:
@@ -171,7 +202,10 @@ jobs:
             const fs=require('node:fs');
             const {verifyReservedStep}=require('./engine/paid-runner.cjs');
             const receipt=JSON.parse(fs.readFileSync('incoming/workorder.json','utf8'));
-            await verifyReservedStep({github,context,receipt,runId:context.runId});
+            const sourceEvidence=context.payload.workflow_run.event==='workflow_dispatch'
+              ?JSON.parse(fs.readFileSync('source-evidence/validated-source.json','utf8'))
+              :undefined;
+            await verifyReservedStep({github,context,receipt,sourceEvidence,runId:context.runId});
             const {data:file}=await github.rest.repos.getContent({
               ...context.repo,path:'lab/sample.py',ref:receipt.sourceSha});
             if(file.type!=='file'||file.encoding!=='base64'||file.size>4096)
@@ -290,6 +324,14 @@ jobs:
         with:
           name: autodev-codex-${{ github.run_id }}
           path: incoming
+      - name: Read trusted source SHA artifact (dispatched CI only)
+        if: github.event.workflow_run.event == 'workflow_dispatch'
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: autodev-validated-${{ github.event.workflow_run.id }}
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          path: source-evidence
       - name: Bind verified patch to source SHA, fast-forward and explicitly dispatch next CI
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
         with:
@@ -298,4 +340,7 @@ jobs:
             const {publishVerifiedPatch}=require('./engine/integrate-patch.cjs');
             const receipt=JSON.parse(fs.readFileSync('incoming/workorder.json','utf8'));
             const patchBytes=fs.readFileSync('incoming/codex.patch');
-            await publishVerifiedPatch({github,context,receipt,patchBytes,runId:context.runId,core});
+            const sourceEvidence=context.payload.workflow_run.event==='workflow_dispatch'
+              ?JSON.parse(fs.readFileSync('source-evidence/validated-source.json','utf8'))
+              :undefined;
+            await publishVerifiedPatch({github,context,receipt,patchBytes,sourceEvidence,runId:context.runId,core});
