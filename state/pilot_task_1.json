@@ -1,10 +1,10 @@
 {
   "taskId": "pilot_task_1",
   "repository": "platsportalen/ci-codex-synthetic-pilot",
-  "phase": "TESTING",
+  "phase": "REPAIRING",
   "headSha": "5968c5ce6e686b92f1d1f96c97a057a5a62c0abf",
   "stepIndex": 1,
-  "repairs": 0,
+  "repairs": 1,
   "seenEventIds": [
     "bootstrap_start",
     "bootstrap_patch",
@@ -13,11 +13,14 @@
     "ci_42473303243",
     "synthetic_new_episode_v2",
     "ci_42473418336",
-    "smoke_red_dispatch_test_20261108"
+    "smoke_red_dispatch_test_20261108",
+    "ci_42479490153"
   ],
   "seenCiRunIds": [
     42472850043,
     42473303243,
-    42473418336
-  ]
+    42473418336,
+    42479490153
+  ],
+  "blocker": null
 }
