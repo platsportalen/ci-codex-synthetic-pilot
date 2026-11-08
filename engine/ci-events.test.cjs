@@ -118,7 +118,7 @@ test('trusted receiver rejects invalid CI before any persistent mutation',async(
   const {github,writes}=fakeGitHub(e,testingState());
   const prior=process.env.GITHUB_RUN_ATTEMPT; process.env.GITHUB_RUN_ATTEMPT='1';
   try{
-    await assert.rejects(()=>processCI({github,context:contextFor(e),core:{setOutput(){},info(){}}}),/current source SHA/);
+    await assert.rejects(()=>processCI({github,context:contextFor(e),core:{setOutput(){},info(){}}}),/current PR source SHA/);
   }finally{if(prior===undefined)delete process.env.GITHUB_RUN_ATTEMPT;else process.env.GITHUB_RUN_ATTEMPT=prior;}
   assert.equal(writes.length,0);
 });
