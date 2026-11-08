@@ -7,13 +7,14 @@ const CONTINUATION=Object.freeze({
   path:'.github/workflows/autodev-continuation-ci.yml',
   validateJob:'Validate exact continuation target',
   testsJob:'Run trusted acceptance cases without credentials',
+  workflowId:411104907,
 });
 function need(value,why){if(!value)throw Error('AUTODEV_SOURCE_DENIED: '+why);}
 
 /* Accept only verified, fresh PR CI evidence. The main-branch workflow_dispatch
    path must have a completed, successful target-validation job; only test failure
    can be interpreted as a repairable coding failure. */
-function verifyCompletedCI({repository,pr,run,payloadRun,attempt,order,jobs}){
+function verifyCompletedCI({repository,pr,run,payloadRun,attempt,order,jobs,sourceEvidence}){
   validateOrder(order);
   const s=order.source;
   need(s&&Number.isSafeInteger(s.repoId)&&Number.isInteger(s.pr)&&
@@ -44,12 +45,15 @@ function verifyCompletedCI({repository,pr,run,payloadRun,attempt,order,jobs}){
     // The trusted workflow definition lives on main and tests PR source as data.
     // GitHub run.head_sha is MAIN SHA, not the PR SHA in this event type.
     need(run.name===CONTINUATION.name&&run.path===CONTINUATION.path &&
-      Number.isSafeInteger(run.workflow_id)&&run.workflow_id>0,
+      run.workflow_id===CONTINUATION.workflowId,
       'trusted continuation CI');
     need(run.head_branch==='main'&&SHA.test(run.head_sha||'') &&
       payloadRun.head_sha===run.head_sha,'trusted main source');
-    need(run.display_title==='autodev-continuation-'+pr.head.sha,
-      'dispatch expected source SHA');
+    need(sourceEvidence?.version===1 && sourceEvidence.repository===order.repository &&
+      sourceEvidence.taskId===order.taskId && sourceEvidence.pr===s.pr &&
+      sourceEvidence.runId===run.id && sourceEvidence.sha===pr.head.sha &&
+      sourceEvidence.controllerSha===run.head_sha,
+      'trusted validated-source artifact');
     need(Array.isArray(jobs)&&
       jobs.some(j=>j.name===CONTINUATION.validateJob&&j.conclusion==='success') &&
       jobs.some(j=>j.name===CONTINUATION.testsJob &&
