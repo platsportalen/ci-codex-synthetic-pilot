@@ -263,3 +263,35 @@ jobs:
           git -C /tmp/autodev-verify init -q
           cd /tmp/autodev-verify
           python verify.py "$GITHUB_WORKSPACE/incoming/codex.patch"
+  integrate_patch:
+    name: Fast-forward verified Codex patch and dispatch next CI (NO API KEY)
+    needs: [decide, codex_paid, verify_codex_paid]
+    if: needs.verify_codex_paid.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: write
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: autodev-next-${{ github.run_id }}
+          path: incoming
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: autodev-codex-${{ github.run_id }}
+          path: incoming
+      - name: Bind verified patch to source SHA, fast-forward and explicitly dispatch next CI
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
+        with:
+          script: |
+            const fs=require('node:fs');
+            const {publishVerifiedPatch}=require('./engine/integrate-patch.cjs');
+            const receipt=JSON.parse(fs.readFileSync('incoming/workorder.json','utf8'));
+            const patchBytes=fs.readFileSync('incoming/codex.patch');
+            await publishVerifiedPatch({github,context,receipt,patchBytes,runId:context.runId,core});
