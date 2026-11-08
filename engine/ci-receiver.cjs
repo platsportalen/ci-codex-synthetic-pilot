@@ -12,7 +12,7 @@ function need(value,why){if(!value)throw Error('AUTODEV_PERSIST_DENIED: '+why);}
  * AI credentials, customer files, merge, deployment or subprocess execution.
  * GitHub Contents API's blob SHA is used as the write precondition.
  */
-async function processCI({github,context,core,order=require('./pilot-order.json')}){
+async function processCI({github,context,core,sourceEvidence,order=require('./pilot-order.json')}){
   validateOrder(order);
   need(context?.repo?.owner==='platsportalen' &&
        context.repo.repo==='ci-codex-synthetic-pilot' &&
@@ -35,7 +35,7 @@ async function processCI({github,context,core,order=require('./pilot-order.json'
     :undefined;
   const verified=verifyCompletedCI({
     repository:context.payload.repository,pr,run,payloadRun:trigger,
-    attempt:Number(process.env.GITHUB_RUN_ATTEMPT),order,jobs
+    attempt:Number(process.env.GITHUB_RUN_ATTEMPT),order,jobs,sourceEvidence
   });
   const {data:file}=await github.rest.repos.getContent({
     ...context.repo,path:STATE_PATH,ref:STATE_BRANCH});
