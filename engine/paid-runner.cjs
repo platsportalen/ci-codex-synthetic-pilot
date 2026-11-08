@@ -15,7 +15,7 @@ function assertSyntheticScope(order,receipt,context){
     context.repo.repo==='ci-codex-synthetic-pilot' &&
     context.ref==='refs/heads/main' && SHA.test(context.sha||''),'trusted controller');
   need(receipt?.stepId==='final_verification' && receipt.stepIndex===1 &&
-    receipt.phase==='CODING' && receipt.action==='PROPOSE_PATCH',
+    ['CODING','REPAIRING'].includes(receipt.phase) && receipt.action==='PROPOSE_PATCH',
     'pilot single approved work step');
   need(receipt.allowedPaths.includes('lab/sample.py') &&
     receipt.allowedPaths.length<=2 &&
@@ -41,8 +41,12 @@ async function reserveStep({github,context,receipt,order=require('./pilot-order.
   const {data:pr}=await github.rest.pulls.get({...context.repo,pull_number:order.source.pr});
   const {data:run}=await github.rest.actions.getWorkflowRun({
     ...context.repo,run_id:receipt.sourceRunId});
+  const jobs=run.event==='workflow_dispatch'
+    ?await github.paginate(github.rest.actions.listJobsForWorkflowRun,{
+      ...context.repo,run_id:run.id,per_page:100,filter:'latest'})
+    :undefined;
   verifyCompletedCI({repository:context.payload.repository,pr,run,
-    payloadRun:context.payload.workflow_run,attempt:1,order});
+    payloadRun:context.payload.workflow_run,attempt:1,order,jobs});
   const {data:blob}=await github.rest.repos.getContent({
     ...context.repo,path:STATE_PATH,ref:STATE_BRANCH});
   need(blob.type==='file'&&blob.encoding==='base64' &&
@@ -93,8 +97,12 @@ async function verifyReservedStep({github,context,receipt,order=require('./pilot
     ...context.repo,pull_number:order.source.pr});
   const {data:sourceRun}=await github.rest.actions.getWorkflowRun({
     ...context.repo,run_id:receipt.sourceRunId});
+  const jobs=sourceRun.event==='workflow_dispatch'
+    ?await github.paginate(github.rest.actions.listJobsForWorkflowRun,{
+      ...context.repo,run_id:sourceRun.id,per_page:100,filter:'latest'})
+    :undefined;
   verifyCompletedCI({repository:context.payload.repository,pr,run:sourceRun,
-    payloadRun:context.payload.workflow_run,attempt:1,order});
+    payloadRun:context.payload.workflow_run,attempt:1,order,jobs});
   need(pr.head.sha===receipt.sourceSha,'PR moved');
   return expected;
 }
