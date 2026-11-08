@@ -91,3 +91,104 @@ jobs:
           cp event-codex/test_result.py /tmp/continuation-ci/test_result.py
           cd /tmp/continuation-ci
           python test_result.py
+  report:
+    name: Persist verified CI result even when source tests fail
+    needs: [validate, tests]
+    if: >-
+      always() && needs.validate.result == 'success' &&
+      (needs.tests.result == 'success' || needs.tests.result == 'failure')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: read
+      pull-requests: read
+    outputs:
+      phase: ${{ steps.record.outputs.phase }}
+      source_run_id: ${{ steps.record.outputs.source_run_id }}
+      source_sha: ${{ steps.record.outputs.source_sha }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Read actual completed validation/test jobs and persist bounded state
+        id: record
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
+        env:
+          SOURCE_SHA: ${{ inputs.expected_sha }}
+          TASK_ID: ${{ inputs.task_id }}
+          TEST_OUTCOME: ${{ needs.tests.result }}
+        with:
+          script: |
+            // Trusted self-report: no dependence on workflow_run from GITHUB_TOKEN dispatch.
+            const {recordTrustedResult}=require('./engine/direct-report.cjs');
+            await recordTrustedResult({github,context,core,
+              taskId:process.env.TASK_ID,expectedSha:process.env.SOURCE_SHA,
+              testOutcome:process.env.TEST_OUTCOME});
+  next_workorder:
+    name: Continue repair or next step without a timer (NO AI)
+    needs: report
+    if: >-
+      needs.report.result == 'success' &&
+      (needs.report.outputs.phase == 'REPAIRING' ||
+       needs.report.outputs.phase == 'CODING')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Generate exact next repair/development receipt from persisted state
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
+        env:
+          SOURCE_RUN_ID: ${{ needs.report.outputs.source_run_id }}
+          SOURCE_SHA: ${{ needs.report.outputs.source_sha }}
+        with:
+          script: |
+            const fs=require('node:fs');
+            const {createWorkOrder,verifyWorkOrder}=require('./engine/continuation.cjs');
+            const order=require('./engine/pilot-order.json');
+            const {data:file}=await github.rest.repos.getContent({
+              ...context.repo,path:'state/pilot_task_1.json',ref:'autodev-state'});
+            if(file.type!=='file'||file.encoding!=='base64'||
+               !/^[0-9a-f]{40}$/.test(file.sha))throw Error('Invalid state blob');
+            const state=JSON.parse(Buffer.from(file.content,'base64').toString('utf8'));
+            const runId=Number(process.env.SOURCE_RUN_ID);
+            const receipt=createWorkOrder(order,state,{
+              sourceRunId:runId,controllerSha:context.sha,stateSha:file.sha});
+            verifyWorkOrder(order,receipt,{sourceRunId:runId,
+              sourceSha:process.env.SOURCE_SHA,controllerSha:context.sha});
+            fs.mkdirSync('next-step',{recursive:true});
+            fs.writeFileSync('next-step/workorder.json',JSON.stringify(receipt,null,2)+'\n');
+            core.info('Bounded next work order '+receipt.phase+' '+receipt.stepId);
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: autodev-direct-next-${{ github.run_id }}
+          path: next-step/workorder.json
+          retention-days: 3
+  verify_direct_next:
+    name: Independently validate new work order (NO API SECRET)
+    needs: [report, next_workorder]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: autodev-direct-next-${{ github.run_id }}
+          path: incoming
+      - name: Independently verify exact task, source SHA, controller and scope
+        env:
+          SOURCE_RUN_ID: ${{ needs.report.outputs.source_run_id }}
+          SOURCE_HEAD_SHA: ${{ needs.report.outputs.source_sha }}
+          CONTROLLER_SHA: ${{ github.sha }}
+        run: node engine/continuation.cjs verify incoming/workorder.json
