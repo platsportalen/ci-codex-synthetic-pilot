@@ -48,6 +48,8 @@ jobs:
           assert source_ci['jobs']['report']['needs'] == ['validate', 'tests']
           assert source_ci['jobs']['report']['permissions']['contents'] == 'write'
           assert source_ci['jobs']['next_workorder']['needs'] == 'report'
+          assert 'always()' in source_ci['jobs']['next_workorder']['if']
+          assert 'always()' in source_ci['jobs']['verify_direct_next']['if']
           assert source_ci['jobs']['verify_direct_next']['permissions']['contents'] == 'read'
           assert 'environment' not in source_ci['jobs']['report']
           assert source_ci['jobs']['tests']['permissions']['contents'] == 'read'
